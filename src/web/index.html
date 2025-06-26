@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 TuneForge - Dataset Builder</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-text">TUNEFORGE</span>
+                </div>
+                <div class="header-status">
+                    <div class="status-item">
+                        <div class="status-dot" id="connectionDot"></div>
+                        <span id="connectionStatus">CONNECTING...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">DATASET:</span>
+                        <span class="status-value" id="datasetCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Configuration Panel -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Configuration</h3>
+                    <div class="config-group">
+                        <label for="systemPrompt">System Prompt</label>
+                        <div class="prompt-controls">
+                            <textarea id="systemPrompt" placeholder="System instructions for AI behavior..." rows="3">You are a helpful AI assistant.</textarea>
+                            <div class="prompt-actions">
+                                <select id="savedPrompts" class="btn-compact">
+                                    <option value="">Load Saved...</option>
+                                </select>
+                                <button id="savePrompt" class="btn-compact">SAVE</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="config-group">
+                        <label>Models</label>
+                        <div id="modelSelection" class="model-selection">
+                            <!-- Models populated by JS -->
+                        </div>
+                    </div>
+
+                    <button id="selectAllModels" class="btn-secondary">SELECT ALL</button>
+                </div>
+            </aside>
+
+            <!-- Conversation Area -->
+            <div class="conversation-area">
+                <!-- Conversation Display -->
+                <div class="conversation-display">
+                    <div class="conversation-header">
+                        <h2>Conversation</h2>
+                        <div class="conversation-actions">
+                            <button id="newConversation" class="btn-ghost">NEW</button>
+                            <button id="saveConversation" class="btn-success" disabled>SAVE</button>
+                        </div>
+                    </div>
+                    
+                    <div class="loom-container">
+                        <div id="conversationFlow" class="conversation-flow">
+                            <div class="empty-state">
+                                <div class="empty-icon">⚡</div>
+                                <h3>Ready</h3>
+                                <p>Configure models and start conversation</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <aside class="controls-panel">
+                <div class="control-section">
+                    <h3>Parameters</h3>
+                    <div class="config-group">
+                        <label for="temperature">Temperature</label>
+                        <div class="slider-container">
+                            <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                            <span class="slider-value" id="temperatureValue">0.7</span>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <label for="maxTokens">Max Tokens</label>
+                        <input type="number" id="maxTokens" min="1" max="4000" value="1000">
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Generation</h3>
+                    <div class="action-buttons">
+                        <button id="regenerateAll" class="btn-secondary">REGEN ALL</button>
+                        <button id="quickSave" class="btn-secondary">QUICK SAVE</button>
+                    </div>
+                </div>
+            </aside>
+
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="status-info">
+                    <div class="status-item">
+                        <span class="status-label">Session:</span>
+                        <span class="status-value" id="sessionStatus">Ready</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Models:</span>
+                        <span class="status-value" id="activeModels">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Turn:</span>
+                        <span class="status-value" id="turnCount">0</span>
+                    </div>
+                </div>
+                
+                <div class="input-header">Input Command</div>
+                
+                <div class="input-main">
+                    <textarea id="userMessage" placeholder="Enter message..."></textarea>
+                    <button id="sendMessage" class="btn-send">
+                        <span>TRANSMIT</span>
+                        <span class="send-icon">→</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Conv:</span>
+                        <span class="stat-value" id="convCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tokens:</span>
+                        <span class="stat-value" id="tokenCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Models:</span>
+                        <span class="stat-value" id="modelCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Quality:</span>
+                        <span class="stat-value" id="qualityScore">--</span>
+                    </div>
+                </div>
+                
+                <div class="status-actions">
+                    <button id="exportDataset" class="btn-micro">JSONL</button>
+                    <button id="exportCSV" class="btn-micro">CSV</button>
+                    <button id="viewStats" class="btn-micro">FULL</button>
+                </div>
+                
+                <div class="keyboard-hints">
+                    ← → NAVIGATE | ENTER SELECT | / FOCUS INPUT | CTRL+N NEW | CTRL+S SAVE | ESC CLOSE
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+
+        <!-- Regenerate Options Modal -->
+        <div id="regenerateModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3>REGENERATE OPTIONS</h3>
+                    <button class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="regenerate-section">
+                        <h4>CORE PARAMETERS</h4>
+                        <div class="config-row">
+                            <div class="config-group">
+                                <label for="newTemperature">Temperature</label>
+                                <div class="slider-container">
+                                    <input type="range" id="newTemperature" min="0" max="2" step="0.1" value="0.7">
+                                    <span class="slider-value" id="newTemperatureValue">0.7</span>
+                                </div>
+                                <small class="param-help">Controls randomness (0.0 = deterministic, 2.0 = very creative)</small>
+                            </div>
+                            <div class="config-group">
+                                <label for="newMaxTokens">Max Tokens</label>
+                                <input type="number" id="newMaxTokens" min="1" max="8000" value="1000">
+                                <small class="param-help">Maximum response length</small>
+                            </div>
+                        </div>
+                        
+                        <div class="config-row">
+                            <div class="config-group">
+                                <label for="newTopP">Top P (nucleus sampling)</label>
+                                <div class="slider-container">
+                                    <input type="range" id="newTopP" min="0" max="1" step="0.05" value="1">
+                                    <span class="slider-value" id="newTopPValue">1.0</span>
+                                </div>
+                                <small class="param-help">Alternative to temperature (0.1 = focused, 1.0 = full range)</small>
+                            </div>
+                            <div class="config-group">
+                                <label for="newFrequencyPenalty">Frequency Penalty</label>
+                                <div class="slider-container">
+                                    <input type="range" id="newFrequencyPenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="newFrequencyPenaltyValue">0.0</span>
+                                </div>
+                                <small class="param-help">Reduces repetition (-2.0 to 2.0)</small>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-group">
+                                <label for="newPresencePenalty">Presence Penalty</label>
+                                <div class="slider-container">
+                                    <input type="range" id="newPresencePenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="newPresencePenaltyValue">0.0</span>
+                                </div>
+                                <small class="param-help">Encourages new topics (-2.0 to 2.0)</small>
+                            </div>
+                            <div class="config-group">
+                                <label for="newSeed">Seed (optional)</label>
+                                <input type="number" id="newSeed" placeholder="Random seed for reproducibility">
+                                <small class="param-help">Set for reproducible outputs</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="regenerate-section">
+                        <h4>SYSTEM PROMPT MODIFICATION</h4>
+                        <div class="config-group">
+                            <textarea id="newSystemPrompt" placeholder="Override system prompt for this regeneration..." rows="3"></textarea>
+                            <small class="param-help">Leave empty to use current system prompt</small>
+                        </div>
+                    </div>
+
+                    <div class="regenerate-section">
+                        <h4>MODEL SELECTION</h4>
+                        <div id="regenerateModelSelection" class="model-selection">
+                            <!-- Models populated by JS -->
+                        </div>
+                        <small class="param-help">Select models to regenerate responses from</small>
+                    </div>
+
+                    <div class="regenerate-section">
+                        <h4>RESPONSE VARIATIONS</h4>
+                        <div class="config-group">
+                            <label for="responseCount">Number of Responses</label>
+                            <select id="responseCount">
+                                <option value="1">1 response per model</option>
+                                <option value="2">2 responses per model</option>
+                                <option value="3">3 responses per model</option>
+                                <option value="5">5 responses per model</option>
+                            </select>
+                            <small class="param-help">Generate multiple variations for comparison</small>
+                        </div>
+                        
+                        <div class="config-group">
+                            <label>
+                                <input type="checkbox" id="usePersonaVariations"> 
+                                Generate persona-based variations
+                            </label>
+                            <small class="param-help">Apply different persona styles to the prompt</small>
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button id="applyRegenerate" class="btn-primary">REGENERATE</button>
+                        <button id="resetToDefaults" class="btn-secondary">RESET DEFAULTS</button>
+                        <button class="btn-secondary modal-close">CANCEL</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Modal -->
+        <div id="statsModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3>DATASET STATISTICS</h3>
+                    <button class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="statsContent" class="stats-content">
+                        <!-- Stats populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <p id="loadingText">PROCESSING...</p>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div id="notifications" class="notifications"></div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
