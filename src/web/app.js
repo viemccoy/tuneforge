@@ -1284,9 +1284,11 @@ class TuneForgeLoom {
     }
     
     showInlineLoading(text = 'PROCESSING...') {
+        // Replace "..." with animated dots
+        const baseText = text.replace(/\.{3}$/, '');
         const loadingHTML = `
             <div class="inline-loading-state simple-loading">
-                <div class="loading-text">${text}</div>
+                <div class="loading-text">${baseText}</div>
                 <div class="loading-dots">
                     <span>.</span>
                     <span>.</span>
