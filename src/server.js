@@ -18,9 +18,15 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  connectionStateRecovery: {}
+});
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Serve static files
 app.use(express.static(join(__dirname, 'web')));
@@ -44,7 +50,8 @@ app.get('/api/personas', (req, res) => {
 
 // Socket.io for real-time interaction
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('✅ User connected:', socket.id);
+  console.log('Active connections:', io.engine.clientsCount);
   
   const modelManager = new ModelManager();
   const personaGenerator = new PersonaGenerator();
@@ -236,7 +243,20 @@ io.on('connection', (socket) => {
   });
 });
 
+// Socket.IO debugging
+io.engine.on("connection_error", (err) => {
+  console.log('❌ Socket.IO connection error:', err.req);
+  console.log('❌ Error code:', err.code);
+  console.log('❌ Error message:', err.message);
+  console.log('❌ Error context:', err.context);
+});
+
+io.on('connect_error', (error) => {
+  console.log('❌ Socket.IO connect error:', error);
+});
+
 server.listen(PORT, () => {
   console.log(`🔥 TuneForge Web Interface running on http://localhost:${PORT}`);
   console.log('🎯 Beautiful dataset builder ready!');
+  console.log('🌐 Socket.IO server initialized');
 });

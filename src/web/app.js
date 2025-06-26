@@ -1,7 +1,17 @@
 // TuneForge - Loom Interface with Arrow Key Navigation
 class TuneForgeLoom {
     constructor() {
-        this.socket = io();
+        console.log('Initializing TuneForge...');
+        this.socket = io('http://localhost:3001', {
+            timeout: 5000,
+            forceNew: true
+        });
+        console.log('Socket.IO initialized, connecting to http://localhost:3001');
+        
+        // Add immediate connection state debugging
+        console.log('Initial socket state:', this.socket.connected);
+        console.log('Socket ID:', this.socket.id);
+        
         this.currentConversationId = null;
         this.selectedModels = [];
         this.conversationHistory = [];
@@ -64,6 +74,7 @@ class TuneForgeLoom {
 
         document.getElementById('maxTokens').addEventListener('input', (e) => {
             this.currentParams.maxTokens = parseInt(e.target.value);
+            document.getElementById('maxTokensValue').textContent = e.target.value;
         });
 
         // Keyboard shortcuts for input
@@ -248,7 +259,14 @@ class TuneForgeLoom {
 
     setupModalHandlers() {
         // Close modals
-        document.querySelectorAll('.modal-close, .modal-backdrop').forEach(element => {
+        document.querySelectorAll('.modal-close').forEach(element => {
+            element.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.closeAllModals();
+            });
+        });
+        
+        document.querySelectorAll('.modal-backdrop').forEach(element => {
             element.addEventListener('click', (e) => {
                 if (e.target === element) {
                     this.closeAllModals();
@@ -279,6 +297,9 @@ class TuneForgeLoom {
         if (!loom) return;
 
         switch (action) {
+            case 'edit':
+                this.editResponse(loom, button);
+                break;
             case 'regenerate':
                 this.regenerateCompletion(loom);
                 break;
@@ -288,29 +309,129 @@ class TuneForgeLoom {
         }
     }
 
+    editResponse(loom, button) {
+        const card = button.closest('.completion-card');
+        const responseIndex = parseInt(card.dataset.index);
+        const response = loom.responses[responseIndex];
+        
+        if (!response) return;
+        
+        const contentDiv = card.querySelector('.completion-content');
+        const currentContent = response.content;
+        
+        // Create textarea for editing
+        const textarea = document.createElement('textarea');
+        textarea.className = 'edit-textarea';
+        textarea.value = currentContent;
+        textarea.style.cssText = `
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-active);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            line-height: 1.4;
+            padding: 1rem;
+            resize: vertical;
+            border-radius: 4px;
+        `;
+        
+        // Create action buttons
+        const editActions = document.createElement('div');
+        editActions.className = 'edit-actions';
+        editActions.style.cssText = `
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            justify-content: flex-end;
+        `;
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'SAVE';
+        saveBtn.className = 'btn-compact btn-success';
+        saveBtn.onclick = () => this.saveEditedResponse(loom, responseIndex, textarea.value, card, contentDiv, editActions);
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'CANCEL';
+        cancelBtn.className = 'btn-compact btn-secondary';
+        cancelBtn.onclick = () => this.cancelEditResponse(card, contentDiv, editActions);
+        
+        editActions.appendChild(saveBtn);
+        editActions.appendChild(cancelBtn);
+        
+        // Replace content with editor
+        contentDiv.style.display = 'none';
+        card.appendChild(textarea);
+        card.appendChild(editActions);
+        
+        // Focus and select text
+        textarea.focus();
+        textarea.select();
+    }
+    
+    saveEditedResponse(loom, responseIndex, newContent, card, contentDiv, editActions) {
+        // Update the response content
+        loom.responses[responseIndex].content = newContent;
+        
+        // Update the display
+        contentDiv.innerHTML = this.formatMessageContent(newContent);
+        
+        // Clean up edit interface
+        card.querySelector('.edit-textarea').remove();
+        editActions.remove();
+        contentDiv.style.display = 'block';
+        
+        this.showNotification('Response updated', 'success');
+    }
+    
+    cancelEditResponse(card, contentDiv, editActions) {
+        // Clean up edit interface
+        card.querySelector('.edit-textarea').remove();
+        editActions.remove();
+        contentDiv.style.display = 'block';
+    }
+
     setupSocketHandlers() {
+        console.log('Setting up Socket.IO handlers...');
+        
         this.socket.on('connect', () => {
+            console.log('✅ Socket.IO connected, ID:', this.socket.id);
             this.updateConnectionStatus(true);
             this.loadAvailableModels();
             this.showNotification('Connected to TuneForge', 'success');
         });
 
-        this.socket.on('disconnect', () => {
+        this.socket.on('disconnect', (reason) => {
+            console.log('❌ Socket.IO disconnected, reason:', reason);
             this.updateConnectionStatus(false);
             this.showNotification('Connection lost. Attempting to reconnect...', 'warning');
             this.hideLoadingOverlay();
         });
 
-        this.socket.on('reconnect', () => {
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('🔄 Socket.IO reconnected after', attemptNumber, 'attempts');
             this.updateConnectionStatus(true);
             this.showNotification('Reconnected to server', 'success');
             this.loadAvailableModels();
         });
 
         this.socket.on('connect_error', (error) => {
+            console.log('❌ Socket.IO connection error:', error);
+            console.log('❌ Error message:', error.message);
+            console.log('❌ Error type:', error.type);
             this.updateConnectionStatus(false);
-            this.showNotification('Connection error. Please check your network.', 'error');
+            this.showNotification('Connection error: ' + error.message, 'error');
             this.hideLoadingOverlay();
+        });
+
+        this.socket.on('reconnect_error', (error) => {
+            console.log('❌ Socket.IO reconnection error:', error);
+        });
+
+        this.socket.on('reconnect_failed', () => {
+            console.log('❌ Socket.IO reconnection failed');
+            this.showNotification('Failed to reconnect. Please refresh the page.', 'error');
         });
 
         this.socket.on('session-started', (data) => {
@@ -534,7 +655,6 @@ class TuneForgeLoom {
     enableConversationInterface() {
         document.getElementById('sendMessage').disabled = false;
         document.getElementById('userMessage').disabled = false;
-        document.getElementById('personaButton').disabled = false;
         this.hideLoadingOverlay();
     }
 
@@ -734,6 +854,7 @@ class TuneForgeLoom {
                 </div>
                 <div class="completion-content">${response.content}</div>
                 <div class="completion-actions">
+                    <button class="action-btn" data-action="edit" title="Edit response">✎</button>
                     <button class="action-btn" data-action="regenerate" title="Regenerate">↻</button>
                     <button class="action-btn" data-action="regenerate-custom" title="Regenerate with options">⚙</button>
                 </div>
@@ -1165,8 +1286,12 @@ class TuneForgeLoom {
     showInlineLoading(text = 'PROCESSING...') {
         const loadingHTML = `
             <div class="inline-loading-state simple-loading">
-                <div class="loading-spinner"></div>
                 <div class="loading-text">${text}</div>
+                <div class="loading-dots">
+                    <span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                </div>
             </div>
         `;
         
@@ -1435,7 +1560,94 @@ class TuneForgeLoom {
 
 // Initialize the loom interface when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new TuneForgeLoom();
+    const loom = new TuneForgeLoom();
+    
+    // Token counter event handler
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.token-btn')) {
+            const button = e.target.closest('.token-btn');
+            const action = button.dataset.action;
+            const tokenInput = document.getElementById('maxTokens');
+            const tokenDisplay = document.getElementById('maxTokensValue');
+            const currentValue = parseInt(tokenInput.value);
+            
+            let newValue = currentValue;
+            
+            if (action === 'decrease') {
+                newValue = Math.max(1, currentValue - 100);
+            } else if (action === 'increase') {
+                newValue = Math.min(8000, currentValue + 100);
+            }
+            
+            if (newValue !== currentValue) {
+                tokenInput.value = newValue;
+                tokenDisplay.textContent = newValue;
+                loom.currentParams.maxTokens = newValue;
+            }
+        }
+        
+        // Token display click-to-edit handler
+        if (e.target.id === 'maxTokensValue') {
+            const tokenDisplay = e.target;
+            const tokenInput = document.getElementById('maxTokens');
+            const currentValue = tokenDisplay.textContent;
+            
+            // Create an input element to replace the display
+            const editInput = document.createElement('input');
+            editInput.type = 'number';
+            editInput.min = '1';
+            editInput.max = '8000';
+            editInput.value = currentValue;
+            editInput.className = 'token-edit-input';
+            editInput.style.cssText = `
+                background: var(--bg-primary);
+                border: 1px solid var(--matrix-green);
+                color: var(--matrix-green);
+                font-family: var(--font-mono);
+                font-size: inherit;
+                text-align: center;
+                width: 60px;
+                padding: 2px;
+                border-radius: 2px;
+            `;
+            
+            // Replace display with input
+            tokenDisplay.style.display = 'none';
+            tokenDisplay.parentNode.insertBefore(editInput, tokenDisplay);
+            editInput.focus();
+            editInput.select();
+            
+            const saveEdit = () => {
+                const newValue = Math.min(8000, Math.max(1, parseInt(editInput.value) || 1));
+                tokenInput.value = newValue;
+                tokenDisplay.textContent = newValue;
+                loom.currentParams.maxTokens = newValue;
+                
+                // Restore display
+                editInput.remove();
+                tokenDisplay.style.display = '';
+            };
+            
+            const cancelEdit = () => {
+                // Restore display without saving
+                editInput.remove();
+                tokenDisplay.style.display = '';
+            };
+            
+            // Handle save/cancel
+            editInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveEdit();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit();
+                }
+            });
+            
+            editInput.addEventListener('blur', saveEdit);
+        }
+    });
 });
 
 // Add some terminal-style effects
