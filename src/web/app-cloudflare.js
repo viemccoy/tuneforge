@@ -227,9 +227,7 @@ class TuneForgeCloudflare {
         // Show bin actions and chat interface
         document.getElementById('binActions').style.display = 'block';
         document.getElementById('noBinMessage').style.display = 'none';
-        document.getElementById('chatSection').style.display = 'flex';
-        document.getElementById('inputArea').style.display = 'block';
-        document.getElementById('configPanel').style.display = 'block';
+        document.getElementById('chatArea').style.display = 'flex';
         
         // Load conversations for this bin
         await this.loadConversations();
@@ -321,9 +319,8 @@ class TuneForgeCloudflare {
                 document.getElementById('currentBinName').textContent = 'NO BIN SELECTED';
                 document.getElementById('conversationCount').textContent = '0';
                 document.getElementById('binActions').style.display = 'none';
-                document.getElementById('chatSection').style.display = 'none';
-                document.getElementById('configPanel').style.display = 'none';
-                document.getElementById('noBinMessage').style.display = 'block';
+                document.getElementById('chatArea').style.display = 'none';
+                document.getElementById('noBinMessage').style.display = 'flex';
             }
         } catch (error) {
             console.error('Failed to delete bin:', error);
