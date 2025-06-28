@@ -14,6 +14,10 @@
     background: var(--bg-primary);
 }
 
+.main-wrapper.no-bin {
+    grid-template-columns: 280px 1fr;
+}
+
 /* Left Panel - Bins */
 .left-panel {
     background: var(--bg-secondary);
@@ -190,6 +194,10 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
+}
+
+.right-panel.hidden {
+    display: none;
 }
 
 .panel-section {
@@ -383,6 +391,7 @@
 .response-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
 }
 
@@ -392,9 +401,70 @@
     font-size: 0.875rem;
 }
 
+.edited-badge {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 400;
+    font-style: italic;
+}
+
+.response-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
 .response-tokens {
     color: var(--text-secondary);
     font-size: 0.75rem;
+}
+
+.response-editor {
+    margin-top: 0.75rem;
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.edit-textarea:focus {
+    outline: none;
+    box-shadow: var(--glow-sm);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
 }
 
 /* Responsive design */

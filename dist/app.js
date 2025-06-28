@@ -228,6 +228,8 @@ class TuneForgeCloudflare {
         document.getElementById('binActions').style.display = 'block';
         document.getElementById('noBinMessage').style.display = 'none';
         document.getElementById('chatArea').style.display = 'flex';
+        document.getElementById('rightPanel').style.display = 'flex';
+        document.getElementById('mainWrapper').classList.remove('no-bin');
         
         // Load conversations for this bin
         await this.loadConversations();
@@ -321,6 +323,8 @@ class TuneForgeCloudflare {
                 document.getElementById('binActions').style.display = 'none';
                 document.getElementById('chatArea').style.display = 'none';
                 document.getElementById('noBinMessage').style.display = 'flex';
+                document.getElementById('rightPanel').style.display = 'none';
+                document.getElementById('mainWrapper').classList.add('no-bin');
             }
         } catch (error) {
             console.error('Failed to delete bin:', error);
@@ -456,14 +460,93 @@ class TuneForgeCloudflare {
             responseEl.className = 'loom-response' + (index === this.activeCompletionIndex ? ' active' : '');
             responseEl.innerHTML = `
                 <div class="response-header">
-                    <span class="response-model">${response.model}</span>
-                    ${response.usage ? `<span class="response-tokens">${response.usage.total_tokens} tokens</span>` : ''}
+                    <span class="response-model">${response.model}${response.edited ? ' <span class="edited-badge">(edited)</span>' : ''}</span>
+                    <div class="response-actions">
+                        <button class="btn-icon edit-btn" data-index="${index}" title="Edit response">✏️</button>
+                        ${response.usage ? `<span class="response-tokens">${response.usage.total_tokens} tokens</span>` : ''}
+                    </div>
                 </div>
-                <div class="response-content">${this.escapeHtml(response.content || response.error || 'No response')}</div>
+                <div class="response-content" id="response-content-${index}">${this.escapeHtml(response.content || response.error || 'No response')}</div>
+                <div class="response-editor" id="response-editor-${index}" style="display: none;">
+                    <textarea class="edit-textarea" id="edit-textarea-${index}">${response.content || ''}</textarea>
+                    <div class="edit-actions">
+                        <button class="btn-compact btn-primary save-edit" data-index="${index}">SAVE</button>
+                        <button class="btn-compact cancel-edit" data-index="${index}">CANCEL</button>
+                    </div>
+                </div>
             `;
-            responseEl.addEventListener('click', () => this.selectCompletion(response, index));
+            
+            // Click on response content to select
+            const contentEl = responseEl.querySelector('.response-content');
+            contentEl.addEventListener('click', () => this.selectCompletion(response, index));
+            
+            // Edit button handler
+            const editBtn = responseEl.querySelector('.edit-btn');
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.startEditingResponse(index);
+            });
+            
+            // Save edit handler
+            const saveBtn = responseEl.querySelector('.save-edit');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.saveEditedResponse(index);
+                });
+            }
+            
+            // Cancel edit handler
+            const cancelBtn = responseEl.querySelector('.cancel-edit');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.cancelEditingResponse(index);
+                });
+            }
             responsesContainer.appendChild(responseEl);
         });
+    }
+    
+    startEditingResponse(index) {
+        // Hide content, show editor
+        document.getElementById(`response-content-${index}`).style.display = 'none';
+        document.getElementById(`response-editor-${index}`).style.display = 'block';
+        
+        // Focus textarea
+        const textarea = document.getElementById(`edit-textarea-${index}`);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+    
+    saveEditedResponse(index) {
+        const textarea = document.getElementById(`edit-textarea-${index}`);
+        const newContent = textarea.value;
+        
+        // Update the response in our data
+        if (this.activeLoom && this.activeLoom.responses[index]) {
+            this.activeLoom.responses[index].content = newContent;
+            this.activeLoom.responses[index].edited = true;
+        }
+        
+        // Update the display
+        document.getElementById(`response-content-${index}`).innerHTML = this.escapeHtml(newContent);
+        
+        // Hide editor, show content
+        document.getElementById(`response-content-${index}`).style.display = 'block';
+        document.getElementById(`response-editor-${index}`).style.display = 'none';
+    }
+    
+    cancelEditingResponse(index) {
+        // Restore original content
+        const textarea = document.getElementById(`edit-textarea-${index}`);
+        if (this.activeLoom && this.activeLoom.responses[index]) {
+            textarea.value = this.activeLoom.responses[index].content || '';
+        }
+        
+        // Hide editor, show content
+        document.getElementById(`response-content-${index}`).style.display = 'block';
+        document.getElementById(`response-editor-${index}`).style.display = 'none';
     }
     
     navigateCompletion(direction) {
