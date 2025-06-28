@@ -1,0 +1,251 @@
+/* Merged UI Layout - 4 column grid with bin management */
+.main-content {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 220px 280px 1fr 260px;
+    gap: 0;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+/* Bin Sidebar Styles */
+.bin-sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    color: var(--matrix-green);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-shadow: var(--glow-sm);
+    margin: 0;
+}
+
+.bin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.bin-item {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bin-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green-dim);
+}
+
+.bin-item.active {
+    background: var(--active-bg);
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+.bin-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.bin-meta {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+}
+
+.bin-actions {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.bin-actions h4 {
+    color: var(--matrix-green);
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+/* Config Sidebar */
+.config-sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+/* Chat Section */
+.chat-section {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.no-bin-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+}
+
+.no-bin-message h3 {
+    color: var(--matrix-green);
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Actions Sidebar */
+.actions-sidebar {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+/* Form Group Styling for Modals */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+    background: var(--bg-secondary);
+}
+
+/* Modal styling */
+.modal-content h2 {
+    color: var(--matrix-green);
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-size: 1.25rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: flex-end;
+}
+
+.modal-actions button,
+.modal-actions .btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.modal-actions button:hover,
+.modal-actions .btn:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.modal-actions .btn-primary {
+    background: var(--matrix-green);
+    color: var(--bg-primary);
+    border-color: var(--matrix-green);
+}
+
+.modal-actions .btn-primary:hover {
+    background: var(--matrix-green-bright);
+    box-shadow: var(--glow-md);
+}
+
+/* Ensure proper button styling */
+.btn-danger {
+    background: #ff4444;
+    color: white;
+    border-color: #ff4444;
+}
+
+.btn-danger:hover {
+    background: #ff6666;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+    .main-content {
+        grid-template-columns: 200px 240px 1fr 220px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .main-content {
+        grid-template-columns: 180px 220px 1fr 200px;
+    }
+    
+    .sidebar {
+        padding: 0.75rem;
+    }
+}

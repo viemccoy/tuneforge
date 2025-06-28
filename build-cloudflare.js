@@ -15,16 +15,17 @@ if (!fs.existsSync(distDir)) {
 
 // Copy static files
 const staticFiles = [
-  'src/web/index-new.html',
+  'src/web/index-merged.html',
   'src/web/app-cloudflare.js',
   'src/web/style.css',
-  'src/web/style-bins.css'
+  'src/web/style-bins.css',
+  'src/web/style-merged.css'
 ];
 
 staticFiles.forEach(file => {
   const src = path.join(__dirname, file);
   const filename = path.basename(file);
-  const dest = path.join(distDir, filename === 'index-new.html' ? 'index.html' : filename);
+  const dest = path.join(distDir, filename === 'index-merged.html' ? 'index.html' : filename);
   
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, dest);
@@ -37,7 +38,8 @@ staticFiles.forEach(file => {
 // Combine CSS files
 const mainCSS = fs.readFileSync(path.join(__dirname, 'src/web/style.css'), 'utf8');
 const binsCSS = fs.readFileSync(path.join(__dirname, 'src/web/style-bins.css'), 'utf8');
-fs.writeFileSync(path.join(distDir, 'style.css'), mainCSS + '\n\n' + binsCSS);
+const mergedCSS = fs.readFileSync(path.join(__dirname, 'src/web/style-merged.css'), 'utf8');
+fs.writeFileSync(path.join(distDir, 'style.css'), mainCSS + '\n\n' + binsCSS + '\n\n' + mergedCSS);
 console.log('✓ Combined CSS files');
 
 // Update HTML to use correct JS file
