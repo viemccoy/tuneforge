@@ -1,14 +1,21 @@
 // Bin management endpoints
-export async function onRequestGet(context) {
-  const { env } = context;
+export async function onRequestGet({ request, env, params, waitUntil, next, data }) {
+  // Debug logging
+  console.log('GET - Full env:', env);
+  console.log('GET - BINS available:', !!env?.BINS);
   
   try {
     // Check if BINS is available
-    if (!env.BINS || typeof env.BINS.list !== 'function') {
+    if (!env?.BINS || typeof env.BINS.list !== 'function') {
       console.error('BINS not found in env:', env);
       return new Response(JSON.stringify({ 
         bins: [],
-        error: 'KV namespace not configured'
+        error: 'KV namespace not configured',
+        debug: {
+          hasEnv: !!env,
+          envKeys: env ? Object.keys(env) : [],
+          hasBINS: !!env?.BINS
+        }
       }), {
         headers: { 'Content-Type': 'application/json' }
       });
@@ -39,13 +46,11 @@ export async function onRequestGet(context) {
   }
 }
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
-  
+export async function onRequestPost({ request, env, params, waitUntil, next, data }) {
   // Debug logging
-  console.log('Environment variables available:', Object.keys(env));
-  console.log('BINS binding:', env.BINS);
-  console.log('Context keys:', Object.keys(context));
+  console.log('Full context:', { env, params, data });
+  console.log('Environment variables available:', env ? Object.keys(env) : 'env is undefined');
+  console.log('BINS binding:', env?.BINS);
   
   try {
     const { systemPrompt, name, description } = await request.json();
@@ -92,8 +97,7 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function onRequestDelete(context) {
-  const { request, env } = context;
+export async function onRequestDelete({ request, env, params, waitUntil, next, data }) {
   const url = new URL(request.url);
   const binId = url.pathname.split('/').pop();
   
