@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 TuneForge - Dataset Builder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Auth Modal -->
+        <div id="authModal" class="modal active">
+            <div class="modal-content auth-modal">
+                <h2>TUNEFORGE ACCESS</h2>
+                <div class="auth-form">
+                    <input type="password" id="authPassword" placeholder="Enter password..." class="auth-input" autofocus>
+                    <button id="authSubmit" class="btn btn-primary">AUTHENTICATE</button>
+                    <div id="authError" class="error-message"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-text">TUNEFORGE</span>
+                </div>
+                <div class="header-status">
+                    <div class="status-item">
+                        <span class="status-label">BIN:</span>
+                        <span class="status-value" id="currentBinName">NO BIN SELECTED</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">CONVERSATIONS:</span>
+                        <span class="status-value" id="conversationCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Bin Management Panel -->
+            <aside class="sidebar bin-panel">
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <h3>DATASET BINS</h3>
+                        <button id="createBin" class="btn-compact btn-primary">+ NEW</button>
+                    </div>
+                    
+                    <div id="binList" class="bin-list">
+                        <!-- Bins will be populated here -->
+                    </div>
+                </div>
+
+                <div class="sidebar-section bin-actions" id="binActions" style="display: none;">
+                    <h4 id="selectedBinName"></h4>
+                    <div class="action-buttons">
+                        <button id="exportBin" class="btn-compact">EXPORT</button>
+                        <button id="deleteBin" class="btn-compact btn-danger">DELETE</button>
+                    </div>
+                    <div class="bin-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Created:</span>
+                            <span class="stat-value" id="binCreated">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Updated:</span>
+                            <span class="stat-value" id="binUpdated">-</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Interface -->
+            <section class="chat-section" id="chatSection" style="display: none;">
+                <div class="conversation-container" id="conversationContainer">
+                    <div class="no-bin-message" id="noBinMessage">
+                        <h3>SELECT OR CREATE A BIN</h3>
+                        <p>Dataset bins organize conversations by system prompt</p>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area" id="inputArea" style="display: none;">
+                    <div class="input-controls">
+                        <textarea id="userMessage" placeholder="Enter your message..." rows="3"></textarea>
+                        <div class="input-actions">
+                            <button id="sendMessage" class="btn btn-primary">SEND</button>
+                            <button id="newConversation" class="btn">NEW CONVERSATION</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration Panel -->
+            <aside class="sidebar config-panel" id="configPanel" style="display: none;">
+                <div class="sidebar-section">
+                    <h3>MODELS</h3>
+                    <div class="model-selector" id="modelSelector">
+                        <!-- Models will be populated here -->
+                    </div>
+                    <button id="selectAllModels" class="btn-compact">SELECT ALL</button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>PARAMETERS</h3>
+                    <div class="parameter-group">
+                        <label>Temperature: <span id="temperatureValue">0.7</span></label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                    <div class="parameter-group">
+                        <label>Max Tokens: <span id="maxTokensValue">1000</span></label>
+                        <input type="range" id="maxTokens" min="100" max="4000" step="100" value="1000">
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>QUICK ACTIONS</h3>
+                    <button id="saveConversation" class="btn btn-primary" disabled>SAVE TO DATASET</button>
+                    <button id="viewConversations" class="btn">VIEW ALL CONVERSATIONS</button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Create Bin Modal -->
+    <div id="createBinModal" class="modal">
+        <div class="modal-content">
+            <h2>CREATE NEW BIN</h2>
+            <div class="form-group">
+                <label>Bin Name</label>
+                <input type="text" id="binName" placeholder="e.g., Customer Support Agent">
+            </div>
+            <div class="form-group">
+                <label>System Prompt</label>
+                <textarea id="binSystemPrompt" rows="4" placeholder="You are a helpful customer support agent..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Description (optional)</label>
+                <input type="text" id="binDescription" placeholder="Dataset for customer support scenarios">
+            </div>
+            <div class="modal-actions">
+                <button id="confirmCreateBin" class="btn btn-primary">CREATE</button>
+                <button class="btn close-modal">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conversations List Modal -->
+    <div id="conversationsModal" class="modal">
+        <div class="modal-content wide">
+            <h2>CONVERSATIONS IN BIN</h2>
+            <div id="conversationsList" class="conversations-list">
+                <!-- Conversations will be populated here -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn close-modal">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

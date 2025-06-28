@@ -1044,8 +1044,8 @@ class TuneForgeLoom {
         // Store reference to current loom
         this.currentRegenerateLoom = loom;
         
-        // Show simple loading for same-parameters regeneration
-        this.showLoadingOverlay('Regenerating with current parameters...');
+        // Show inline loading for same-parameters regeneration
+        this.showInlineLoading('Regenerating with current parameters...');
 
         // Get the current conversation context
         const lastUserMessage = this.conversationHistory

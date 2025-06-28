@@ -1,0 +1,256 @@
+/* Bin Management Styles */
+
+/* Bin Panel */
+.bin-panel {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.bin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.bin-item {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bin-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green-dim);
+}
+
+.bin-item.active {
+    background: var(--active-bg);
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+.bin-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.bin-meta {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.bin-actions {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.bin-actions h4 {
+    color: var(--matrix-green);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bin-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    color: var(--text-primary);
+}
+
+/* Chat Section Updates */
+.chat-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.no-bin-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.no-bin-message h3 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+/* Config Panel */
+.config-panel {
+    border-left: 1px solid var(--border-color);
+}
+
+/* Conversations List */
+.conversations-list {
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.conversation-item {
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.conv-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.conv-date {
+    color: var(--text-secondary);
+}
+
+.conv-turns {
+    color: var(--matrix-green);
+}
+
+.conv-preview {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    border-radius: 4px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+/* Button Variants */
+.btn-primary {
+    background: var(--matrix-green);
+    color: var(--bg-primary);
+    border-color: var(--matrix-green);
+}
+
+.btn-primary:hover {
+    background: var(--matrix-green-bright);
+    box-shadow: var(--glow-md);
+}
+
+.btn-primary:disabled {
+    background: var(--text-muted);
+    border-color: var(--text-muted);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-danger {
+    background: #ff4444;
+    color: white;
+    border-color: #ff4444;
+}
+
+.btn-danger:hover {
+    background: #ff6666;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+}
+
+/* Empty States */
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Notifications */
+.notification {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--matrix-green);
+    color: var(--bg-primary);
+    padding: 1rem 1.5rem;
+    border-radius: 4px;
+    box-shadow: var(--glow-lg);
+    animation: slideIn 0.3s ease;
+    z-index: 1000;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Modal Updates */
+.modal.active {
+    display: flex;
+}
+
+.modal-content.wide {
+    max-width: 800px;
+    width: 90%;
+}

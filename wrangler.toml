@@ -1,0 +1,32 @@
+name = "tuneforge"
+main = "src/index.js"
+compatibility_date = "2024-06-26"
+
+[site]
+bucket = "./dist"
+
+[[kv_namespaces]]
+binding = "BINS"
+id = "your-kv-namespace-id"
+preview_id = "your-kv-preview-id"
+
+[[kv_namespaces]]
+binding = "CONVERSATIONS"
+id = "your-conversations-namespace-id"
+preview_id = "your-conversations-preview-id"
+
+[[durable_objects]]
+name = "WebSocketDurableObject"
+class_name = "WebSocketDurableObject"
+
+[[durable_objects.migrations]]
+tag = "v1"
+new_classes = ["WebSocketDurableObject"]
+
+[vars]
+# These will be overridden by Cloudflare Pages environment settings
+# AUTH_PASSWORD will be set in Cloudflare Pages settings
+
+[build]
+command = "npm run build"
+watch_paths = ["src/**/*.{js,jsx,ts,tsx,css,html}"]
