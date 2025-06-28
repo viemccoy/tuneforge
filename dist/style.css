@@ -1228,20 +1228,22 @@ input[type="range"]::-moz-range-thumb {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(2px);
 }
 
 .modal-content {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green);
     border-radius: 4px;
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
+    box-shadow: var(--glow-lg);
     z-index: 1;
-    box-shadow: var(--glow-md);
+    padding: 2rem;
 }
 
 .modal-content.large {
@@ -2020,25 +2022,31 @@ input[type="range"]::-moz-range-thumb {
 
 /* Form Groups */
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     color: var(--text-primary);
     font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
 }
 
 .form-group input,
 .form-group textarea {
     width: 100%;
-    padding: 0.5rem;
-    background: var(--bg-tertiary);
+    padding: 0.75rem;
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     font-family: var(--font-mono);
     border-radius: 4px;
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
 }
 
 .form-group input:focus,
@@ -2046,6 +2054,7 @@ input[type="range"]::-moz-range-thumb {
     outline: none;
     border-color: var(--matrix-green);
     box-shadow: var(--glow-sm);
+    background: var(--bg-secondary);
 }
 
 /* Button Variants */
@@ -2119,4 +2128,79 @@ input[type="range"]::-moz-range-thumb {
 .modal-content.wide {
     max-width: 800px;
     width: 90%;
+}
+
+.modal-content h2 {
+    color: var(--matrix-green);
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-size: 1.25rem;
+}
+
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.modal-actions button:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.modal-actions .btn-primary {
+    background: var(--matrix-green);
+    color: var(--bg-primary);
+    border-color: var(--matrix-green);
+}
+
+.modal-actions .btn-primary:hover {
+    background: var(--matrix-green-bright);
+    box-shadow: var(--glow-md);
+}
+
+/* Base button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
 }
