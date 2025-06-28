@@ -13,9 +13,9 @@ export async function onRequest(context) {
   const sessionCookie = getCookie(request, 'tuneforge-session');
   
   if (!authHeader && !sessionCookie) {
-    return new Response('Unauthorized', { 
+    return new Response(JSON.stringify({ error: 'Authentication required' }), { 
       status: 401,
-      headers: { 'WWW-Authenticate': 'Basic realm="TuneForge"' }
+      headers: { 'Content-Type': 'application/json' }
     });
   }
   

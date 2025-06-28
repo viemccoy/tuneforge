@@ -289,6 +289,10 @@ class TuneForgeCloudflare {
                 
                 // Select the new bin
                 this.selectBin(bin);
+            } else {
+                const error = await response.text();
+                console.error('Failed to create bin:', response.status, error);
+                alert(`Failed to create bin: ${response.status} - ${error}`);
             }
         } catch (error) {
             console.error('Failed to create bin:', error);
