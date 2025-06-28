@@ -3,6 +3,17 @@ export async function onRequestGet(context) {
   const { env } = context;
   
   try {
+    // Check if BINS is available
+    if (!env.BINS || typeof env.BINS.list !== 'function') {
+      console.error('BINS not found in env:', env);
+      return new Response(JSON.stringify({ 
+        bins: [],
+        error: 'KV namespace not configured'
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
     // List all bins
     const list = await env.BINS.list();
     const bins = [];
@@ -31,6 +42,11 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  // Debug logging
+  console.log('Environment variables available:', Object.keys(env));
+  console.log('BINS binding:', env.BINS);
+  console.log('Context keys:', Object.keys(context));
+  
   try {
     const { systemPrompt, name, description } = await request.json();
     
@@ -56,6 +72,11 @@ export async function onRequestPost(context) {
       conversationCount: 0,
       lastUpdated: new Date().toISOString()
     };
+    
+    // Check if BINS is available
+    if (!env.BINS || typeof env.BINS.put !== 'function') {
+      throw new Error('KV namespace BINS is not properly bound. Please check your Cloudflare Pages KV namespace bindings.');
+    }
     
     await env.BINS.put(binId, JSON.stringify(binData));
     
