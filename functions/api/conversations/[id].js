@@ -1,5 +1,48 @@
 // Dynamic route handler for /api/conversations/:id
 
+export async function onRequestDelete({ params, request, env }) {
+  const conversationId = params.id;
+  const url = new URL(request.url);
+  const binId = url.searchParams.get('binId');
+  
+  if (!env || !env.CONVERSATIONS) {
+    return new Response(JSON.stringify({ error: 'KV namespace CONVERSATIONS is not available' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (!conversationId || !binId) {
+    return new Response(JSON.stringify({ error: 'Conversation and Bin ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  try {
+    const key = `${binId}:${conversationId}`;
+    await env.CONVERSATIONS.delete(key);
+    
+    // Update bin conversation count
+    const binData = await env.BINS.get(binId, 'json');
+    if (binData && binData.conversationCount > 0) {
+      binData.conversationCount--;
+      binData.lastUpdated = new Date().toISOString();
+      await env.BINS.put(binId, JSON.stringify(binData));
+    }
+    
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Delete error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
 export async function onRequestPut({ params, request, env }) {
   const conversationId = params.id;
   

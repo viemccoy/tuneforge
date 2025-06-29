@@ -739,3 +739,151 @@
 .completion-model:contains("(edited)") {
     color: var(--matrix-green-bright);
 }
+
+/* Regenerate button and menu styles */
+.regen-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    margin-left: 0.5rem;
+}
+
+.regen-btn:hover {
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.regen-menu {
+    display: none;
+    margin-top: 1rem;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green);
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+.regen-menu.active {
+    display: block;
+}
+
+.regen-menu h4 {
+    color: var(--matrix-green-bright);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.regen-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.regen-controls .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.regen-controls label {
+    color: var(--matrix-green);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.regen-controls input[type="range"],
+.regen-controls input[type="number"],
+.regen-controls select,
+.regen-controls textarea {
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.5rem;
+    font-family: 'Courier New', monospace;
+    border-radius: 3px;
+}
+
+.regen-controls input[type="range"] {
+    -webkit-appearance: none;
+    height: 5px;
+    background: var(--matrix-green-dim);
+    outline: none;
+}
+
+.regen-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    background: var(--matrix-green);
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.value-display {
+    color: var(--matrix-green-bright);
+    font-weight: bold;
+    min-width: 2rem;
+    display: inline-block;
+    text-align: right;
+}
+
+.regen-controls textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.regen-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* Regenerating state */
+.completion-card.regenerating {
+    opacity: 0.6;
+    position: relative;
+}
+
+.completion-card.regenerating::after {
+    content: 'REGENERATING...';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--matrix-green-bright);
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+/* Loading dots animation */
+.loading-dots span {
+    animation: pulse 1.4s infinite ease-in-out;
+    opacity: 0;
+}
+
+.loading-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes pulse {
+    0%, 60%, 100% {
+        opacity: 0;
+    }
+    30% {
+        opacity: 1;
+    }
+}

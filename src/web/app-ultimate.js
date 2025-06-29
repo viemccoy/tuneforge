@@ -377,12 +377,15 @@ class TuneForgeUltimate {
             `;
             binHeader.addEventListener('click', async (e) => {
                 e.stopPropagation();
+                console.log('Bin header clicked:', bin.name);
                 
                 // Select the bin if it's not already selected
                 if (this.currentBin?.id !== bin.id) {
+                    console.log('Selecting bin:', bin.id);
                     await this.selectBin(bin);
                 } else {
                     // If already selected, just toggle expansion
+                    console.log('Toggling bin expansion:', bin.id);
                     this.toggleBinExpanded(bin.id);
                 }
             });
@@ -514,7 +517,7 @@ class TuneForgeUltimate {
         
         // Start new conversation only if not loading a specific conversation
         if (!skipNewConversation) {
-            this.newConversation();
+            this.clearConversation();
         }
     }
     
@@ -833,7 +836,12 @@ class TuneForgeUltimate {
             
             // If conversation exists, save it with the new name
             if (this.currentConversationId) {
-                this.saveConversation(true);
+                this.saveConversation(true).then(() => {
+                    // Refresh the conversation list to show the new name
+                    if (this.currentBin) {
+                        this.loadConversationsForBin(this.currentBin.id);
+                    }
+                });
             }
         }
         
@@ -923,6 +931,28 @@ class TuneForgeUltimate {
         this.showNewConversationModal();
     }
     
+    clearConversation() {
+        // Clear conversation without showing modal (used internally)
+        this.currentMessages = [];
+        this.currentConversationId = null;
+        this.currentConversationName = '';
+        this.currentConversationDescription = '';
+        
+        document.getElementById('conversationFlow').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">⚡</div>
+                <h3>Ready</h3>
+                <p>Start your conversation</p>
+            </div>
+        `;
+        document.getElementById('saveConversation').disabled = true;
+        document.getElementById('deleteConversation').disabled = true;
+        document.getElementById('turnCount').textContent = '0';
+        document.getElementById('userMessage').value = '';
+        
+        this.updateConversationNameDisplay();
+    }
+    
     async sendMessage() {
         if (!this.currentBin) {
             alert('Please select a bin first');
@@ -954,20 +984,25 @@ class TuneForgeUltimate {
         if (this.isCloudflare) {
             // Cloudflare API call
             try {
+                console.log('Sending request with models:', this.selectedModels);
+                const requestBody = {
+                    binId: this.currentBin.id,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    messages: this.currentMessages,
+                    models: this.selectedModels,
+                    temperature,
+                    maxTokens
+                };
+                console.log('Full request body:', requestBody);
+                
                 const response = await fetch(`${this.apiBase}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        binId: this.currentBin.id,
-                        systemPrompt: document.getElementById('systemPrompt').value,
-                        messages: this.currentMessages,
-                        models: this.selectedModels,
-                        temperature,
-                        maxTokens
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
+                console.log('Response data:', data);
                 this.handleResponses({ responses: data.responses });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
@@ -1017,8 +1052,7 @@ class TuneForgeUltimate {
         loadingEl.className = 'message-block loading-loom';
         loadingEl.innerHTML = `
             <div class="inline-loading-state simple-loading">
-                <div class="loading-icon">⚡</div>
-                <div class="loading-text">GENERATING RESPONSES...</div>
+                <div class="loading-text">GENERATING RESPONSES<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></div>
             </div>
         `;
         flow.appendChild(loadingEl);
@@ -1026,14 +1060,18 @@ class TuneForgeUltimate {
     }
     
     handleResponses(data) {
+        console.log('handleResponses called with:', data);
         const flow = document.getElementById('conversationFlow');
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
         if (!data.responses || data.responses.length === 0) {
+            console.error('No responses in data:', data);
             this.showNotification('No responses generated', 'error');
             return;
         }
+        
+        console.log('Processing responses:', data.responses);
         
         // Create loom
         const loomEl = document.createElement('div');
@@ -1095,12 +1133,44 @@ class TuneForgeUltimate {
                 ${!isError ? `
                 <div class="response-actions">
                     <button class="edit-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">✏️</button>
+                    <button class="regen-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">🔄</button>
                 </div>
                 <div class="response-editor" id="editor-${index}">
                     <textarea class="edit-textarea" id="edit-textarea-${index}">${response.content}</textarea>
                     <div class="edit-actions">
                         <button class="btn-compact btn-primary save-edit" onclick="tuneforge.saveEdit(${index})">SAVE</button>
                         <button class="btn-compact cancel-edit" onclick="tuneforge.cancelEdit(${index})">CANCEL</button>
+                    </div>
+                </div>
+                <div class="regen-menu" id="regen-menu-${index}">
+                    <div class="regen-section">
+                        <h4>Regenerate Settings</h4>
+                        <div class="regen-controls">
+                            <div class="control-group">
+                                <label>Temperature</label>
+                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}">
+                                <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span>
+                            </div>
+                            <div class="control-group">
+                                <label>Max Tokens</label>
+                                <input type="number" id="regen-tokens-${index}" min="100" max="4000" value="${response.maxTokens || 1000}">
+                            </div>
+                            <div class="control-group">
+                                <label>Model</label>
+                                <select id="regen-model-${index}">
+                                    <option value="same">Same Model (${response.model})</option>
+                                    ${this.availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>Custom Instructions</label>
+                                <textarea id="regen-instructions-${index}" placeholder="Add specific instructions for regeneration..."></textarea>
+                            </div>
+                        </div>
+                        <div class="regen-actions">
+                            <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">REGENERATE</button>
+                            <button class="btn-compact" onclick="tuneforge.closeRegenMenu(${index})">CANCEL</button>
+                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -1203,6 +1273,101 @@ class TuneForgeUltimate {
         // Reset textarea
         if (this.activeLoom && this.activeLoom.responses[index]) {
             document.getElementById(`edit-textarea-${index}`).value = this.activeLoom.responses[index].content;
+        }
+    }
+    
+    showRegenMenu(index) {
+        // Close any open editors or menus
+        document.querySelectorAll('.response-editor.active').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.regen-menu.active').forEach(el => el.classList.remove('active'));
+        
+        // Open this regenerate menu
+        document.getElementById(`regen-menu-${index}`).classList.add('active');
+        
+        // Set up slider listener
+        const slider = document.getElementById(`regen-temp-${index}`);
+        const valueDisplay = document.getElementById(`regen-temp-val-${index}`);
+        slider.oninput = () => valueDisplay.textContent = slider.value;
+    }
+    
+    closeRegenMenu(index) {
+        document.getElementById(`regen-menu-${index}`).classList.remove('active');
+    }
+    
+    async regenerateSingle(index) {
+        if (!this.activeLoom || !this.activeLoom.responses[index]) return;
+        
+        const response = this.activeLoom.responses[index];
+        const temperature = parseFloat(document.getElementById(`regen-temp-${index}`).value);
+        const maxTokens = parseInt(document.getElementById(`regen-tokens-${index}`).value);
+        const modelSelect = document.getElementById(`regen-model-${index}`).value;
+        const customInstructions = document.getElementById(`regen-instructions-${index}`).value;
+        
+        const model = modelSelect === 'same' ? response.model : modelSelect;
+        
+        // Close the menu
+        this.closeRegenMenu(index);
+        
+        // Show loading state on this card
+        const card = document.querySelector(`.completion-card[data-index="${index}"]`);
+        card.classList.add('regenerating');
+        
+        // Build messages with optional custom instructions
+        const messages = [...this.currentMessages];
+        if (customInstructions) {
+            messages.push({ role: 'system', content: customInstructions });
+        }
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await fetch(`${this.apiBase}/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        binId: this.currentBin.id,
+                        systemPrompt: document.getElementById('systemPrompt').value,
+                        messages,
+                        models: [model],
+                        temperature,
+                        maxTokens
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.responses && data.responses[0]) {
+                    // Update the response in place
+                    this.activeLoom.responses[index] = {
+                        ...data.responses[0],
+                        regenerated: true,
+                        originalModel: this.activeLoom.responses[index].model
+                    };
+                    
+                    // Update the card content
+                    this.updateCompletionCard(index);
+                }
+            } catch (error) {
+                console.error('Regeneration failed:', error);
+                this.showNotification('Failed to regenerate response', 'error');
+            }
+        }
+        
+        card.classList.remove('regenerating');
+    }
+    
+    updateCompletionCard(index) {
+        const card = document.querySelector(`.completion-card[data-index="${index}"]`);
+        const response = this.activeLoom.responses[index];
+        
+        // Update model name
+        card.querySelector('.completion-model').textContent = 
+            `${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}${response.regenerated ? ' (regenerated)' : ''}`;
+        
+        // Update content
+        card.querySelector('.completion-content').innerHTML = this.escapeHtml(response.content);
+        
+        // Update token count if available
+        if (response.usage) {
+            card.querySelector('.completion-stats').textContent = `${response.usage.total_tokens} tokens`;
         }
     }
     
@@ -1359,7 +1524,7 @@ class TuneForgeUltimate {
                     await this.loadConversationsForBin(this.currentBin.id);
                     
                     // Clear current conversation and start new
-                    this.newConversation();
+                    this.clearConversation();
                     this.updateStats();
                     this.showNotification('Conversation deleted successfully');
                 } else {
@@ -1394,7 +1559,7 @@ class TuneForgeUltimate {
             await this.loadConversationsForBin(this.currentBin.id);
             
             // Clear current conversation and start new
-            this.newConversation();
+            this.clearConversation();
             this.updateStats();
             this.showNotification('Conversation deleted successfully');
         }
