@@ -271,14 +271,17 @@ class TuneForgeUltimate {
                 switch(e.key) {
                     case 'ArrowLeft':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.navigateLoom(-1);
                         break;
                     case 'ArrowRight':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.navigateLoom(1);
                         break;
                     case 'Enter':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.selectLoomResponse();
                         break;
                 }
@@ -1117,7 +1120,7 @@ class TuneForgeUltimate {
         const loomEl = document.createElement('div');
         loomEl.className = 'message-block';
         loomEl.innerHTML = `
-            <div class="completion-loom">
+            <div class="completion-loom" tabindex="0">
                 <div class="completion-header">
                     <div class="completion-title">ASSISTANT RESPONSES</div>
                     <div class="completion-nav">
@@ -1149,6 +1152,12 @@ class TuneForgeUltimate {
             responses: data.responses,
             currentIndex: 0
         };
+        
+        // Focus the loom for keyboard navigation
+        const loomElement = loomEl.querySelector('.completion-loom');
+        if (loomElement) {
+            setTimeout(() => loomElement.focus(), 100);
+        }
         
         // Enable save button
         document.getElementById('saveConversation').disabled = false;
