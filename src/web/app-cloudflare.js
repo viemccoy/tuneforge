@@ -216,29 +216,32 @@ class TuneForgeCloudflare {
     }
     
     async selectBin(bin) {
-        this.currentBin = bin;
-        
-        // Update UI
-        document.getElementById('currentBinName').textContent = bin.name;
-        document.getElementById('selectedBinName').textContent = bin.name;
-        document.getElementById('binCreated').textContent = new Date(bin.createdAt).toLocaleDateString();
-        document.getElementById('binUpdated').textContent = new Date(bin.lastUpdated).toLocaleDateString();
-        
-        // Show bin actions and chat interface
-        document.getElementById('binActions').style.display = 'block';
-        document.getElementById('noBinMessage').style.display = 'none';
-        document.getElementById('chatArea').style.display = 'flex';
-        document.getElementById('rightPanel').style.display = 'flex';
-        document.getElementById('mainWrapper').classList.remove('no-bin');
-        
-        // Load conversations for this bin
-        await this.loadConversations();
-        
-        // Update bin list UI
-        this.renderBinList();
-        
-        // Clear current conversation
-        this.startNewConversation();
+        try {
+            this.currentBin = bin;
+            
+            // Update UI
+            document.getElementById('currentBinName').textContent = bin.name;
+            document.getElementById('selectedBinName').textContent = bin.name;
+            
+            // Show bin actions and chat interface
+            document.getElementById('binActions').style.display = 'block';
+            document.getElementById('noBinMessage').style.display = 'none';
+            document.getElementById('chatArea').style.display = 'flex';
+            document.getElementById('rightPanel').style.display = 'flex';
+            document.getElementById('mainWrapper').classList.remove('no-bin');
+            
+            // Load conversations for this bin
+            await this.loadConversations();
+            
+            // Update bin list UI
+            this.renderBinList();
+            
+            // Clear current conversation
+            this.startNewConversation();
+        } catch (error) {
+            console.error('Error selecting bin:', error);
+            alert('Failed to select bin: ' + error.message);
+        }
     }
     
     async loadConversations() {
@@ -278,6 +281,7 @@ class TuneForgeCloudflare {
             
             if (response.ok) {
                 const bin = await response.json();
+                console.log('Created bin:', bin);
                 this.bins.push(bin);
                 this.renderBinList();
                 document.getElementById('createBinModal').classList.remove('active');
@@ -288,7 +292,7 @@ class TuneForgeCloudflare {
                 document.getElementById('binDescription').value = '';
                 
                 // Select the new bin
-                this.selectBin(bin);
+                await this.selectBin(bin);
             } else {
                 const error = await response.text();
                 console.error('Failed to create bin:', response.status, error);
