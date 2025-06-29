@@ -98,8 +98,19 @@ export async function onRequestPost({ request, env, params, waitUntil, next, dat
 }
 
 export async function onRequestDelete({ request, env, params, waitUntil, next, data }) {
+  // Check if env and BINS are available
+  if (!env || !env.BINS) {
+    return new Response(JSON.stringify({ error: 'KV namespace BINS is not available' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
   const url = new URL(request.url);
-  const binId = url.pathname.split('/').pop();
+  const pathParts = url.pathname.split('/');
+  const binId = pathParts[pathParts.length - 1];
+  
+  console.log('DELETE request for bin:', binId);
   
   if (!binId || binId === 'bins') {
     return new Response(JSON.stringify({ error: 'Bin ID required' }), {
@@ -109,10 +120,21 @@ export async function onRequestDelete({ request, env, params, waitUntil, next, d
   }
   
   try {
-    // Delete all conversations in the bin
-    const conversationsList = await env.CONVERSATIONS.list({ prefix: `${binId}:` });
-    for (const key of conversationsList.keys) {
-      await env.CONVERSATIONS.delete(key.name);
+    // Check if bin exists
+    const binData = await env.BINS.get(binId);
+    if (!binData) {
+      return new Response(JSON.stringify({ error: 'Bin not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Delete all conversations in the bin if CONVERSATIONS namespace exists
+    if (env.CONVERSATIONS) {
+      const conversationsList = await env.CONVERSATIONS.list({ prefix: `${binId}:` });
+      for (const key of conversationsList.keys) {
+        await env.CONVERSATIONS.delete(key.name);
+      }
     }
     
     // Delete the bin
@@ -122,6 +144,7 @@ export async function onRequestDelete({ request, env, params, waitUntil, next, d
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('Delete error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

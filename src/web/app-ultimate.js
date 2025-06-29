@@ -557,11 +557,16 @@ class TuneForgeUltimate {
     }
     
     async deleteBin() {
-        if (!this.currentBin) return;
+        if (!this.currentBin) {
+            console.log('No bin selected to delete');
+            return;
+        }
         
         if (!confirm(`Delete bin "${this.currentBin.name}" and all its conversations?`)) {
             return;
         }
+        
+        console.log('Deleting bin:', this.currentBin.id);
         
         if (this.isCloudflare) {
             try {
@@ -569,14 +574,22 @@ class TuneForgeUltimate {
                     method: 'DELETE'
                 });
                 
+                console.log('Delete response status:', response.status);
+                
                 if (response.ok) {
                     this.bins = this.bins.filter(b => b.id !== this.currentBin.id);
                     this.currentBin = null;
                     this.renderBinList();
                     this.resetToNoBinState();
+                    this.showNotification('Bin deleted successfully');
+                } else {
+                    const error = await response.text();
+                    console.error('Delete failed:', error);
+                    this.showNotification(`Failed to delete bin: ${response.status}`, 'error');
                 }
             } catch (error) {
                 console.error('Failed to delete bin:', error);
+                this.showNotification('Failed to delete bin', 'error');
             }
         } else {
             // Local storage mode
@@ -591,6 +604,7 @@ class TuneForgeUltimate {
             this.currentBin = null;
             this.renderBinList();
             this.resetToNoBinState();
+            this.showNotification('Bin deleted successfully');
         }
     }
     
