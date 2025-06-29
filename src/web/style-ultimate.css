@@ -696,7 +696,7 @@
 
 .response-editor {
     display: none;
-    margin-top: 0.5rem;
+    margin-top: -1rem;
     margin-bottom: 1rem;
     padding: 1.25rem;
     background: #000000;
@@ -826,7 +826,7 @@
 
 .regen-menu {
     display: none;
-    margin-top: 0.5rem;
+    margin-top: -1rem;
     margin-bottom: 1rem;
     padding: 0;
     background: #000000;
@@ -836,8 +836,9 @@
                 inset 0 0 20px rgba(0, 255, 65, 0.1);
     position: relative;
     z-index: 25;
-    overflow: hidden;
-    max-width: 600px;
+    overflow: visible;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .regen-menu.active {
