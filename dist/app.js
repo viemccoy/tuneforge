@@ -366,6 +366,7 @@ class TuneForgeUltimate {
         this.bins.forEach(bin => {
             const binEl = document.createElement('div');
             binEl.className = 'bin-folder' + (this.currentBin?.id === bin.id ? ' active' : '');
+            binEl.dataset.binId = bin.id; // Add data attribute for easier lookup
             
             // Bin header (clickable to expand/collapse)
             const binHeader = document.createElement('div');
@@ -452,6 +453,7 @@ class TuneForgeUltimate {
         conversations.forEach(conv => {
             const convEl = document.createElement('div');
             convEl.className = 'conversation-file';
+            convEl.dataset.conversationId = conv.id; // Add data attribute for easier lookup
             
             const displayName = conv.name || this.getConversationPreview(conv);
             const date = new Date(conv.metadata.createdAt);
@@ -459,10 +461,10 @@ class TuneForgeUltimate {
             convEl.innerHTML = `
                 <span class="file-icon">📄</span>
                 <div class="file-info">
-                    <div class="file-name">${this.escapeHtml(displayName)}</div>
+                    <div class="file-name" data-conv-name="${conv.id}">${this.escapeHtml(displayName)}</div>
                     <div class="file-meta">
                         <span>${date.toLocaleDateString()}</span>
-                        <span>${conv.metadata.turnCount} turns</span>
+                        <span class="turn-count">${conv.metadata.turnCount} turns</span>
                     </div>
                 </div>
             `;
@@ -807,6 +809,28 @@ class TuneForgeUltimate {
         nameEl.textContent = this.currentConversationName || 'New Conversation';
     }
     
+    updateConversationNameInLists(conversationId, newName) {
+        // Update all conversation file elements with this ID
+        const convElements = document.querySelectorAll(`[data-conversation-id="${conversationId}"]`);
+        convElements.forEach(convEl => {
+            const nameEl = convEl.querySelector('.file-name');
+            if (nameEl) {
+                nameEl.textContent = newName;
+            }
+        });
+        
+        // Also update turn count if the conversation was just saved
+        const conv = this.conversations.find(c => c.id === conversationId);
+        if (conv) {
+            convElements.forEach(convEl => {
+                const turnCountEl = convEl.querySelector('.turn-count');
+                if (turnCountEl && conv.metadata) {
+                    turnCountEl.textContent = `${conv.metadata.turnCount} turns`;
+                }
+            });
+        }
+    }
+    
     startEditingConversationName() {
         const nameEl = document.getElementById('conversationName');
         const inputEl = document.getElementById('conversationNameInput');
@@ -820,24 +844,41 @@ class TuneForgeUltimate {
         inputEl.select();
     }
     
-    saveConversationName() {
+    async saveConversationName() {
         const inputEl = document.getElementById('conversationNameInput');
         const nameEl = document.getElementById('conversationName');
         const editBtn = document.getElementById('editConversationName');
         
         const newName = inputEl.value.trim();
-        if (newName) {
+        if (newName && newName !== this.currentConversationName) {
+            const oldName = this.currentConversationName;
             this.currentConversationName = newName;
             nameEl.textContent = newName;
             
             // If conversation exists, save it with the new name
             if (this.currentConversationId) {
-                this.saveConversation(true).then(() => {
-                    // Refresh the conversation list to show the new name
+                try {
+                    await this.saveConversation(true);
+                    
+                    // Force refresh the conversation list to show the new name
                     if (this.currentBin) {
-                        this.loadConversationsForBin(this.currentBin.id);
+                        // Update the local conversations array immediately
+                        const convIndex = this.conversations.findIndex(c => c.id === this.currentConversationId);
+                        if (convIndex > -1) {
+                            this.conversations[convIndex].name = newName;
+                        }
+                        
+                        // Update the conversation name in all visible lists
+                        this.updateConversationNameInLists(this.currentConversationId, newName);
                     }
-                });
+                    
+                    this.showNotification('Conversation renamed successfully');
+                } catch (error) {
+                    // Revert on error
+                    this.currentConversationName = oldName;
+                    nameEl.textContent = oldName;
+                    this.showNotification('Failed to rename conversation', 'error');
+                }
             }
         }
         
@@ -1316,12 +1357,17 @@ class TuneForgeUltimate {
         document.querySelectorAll('.regen-menu.active').forEach(el => el.classList.remove('active'));
         
         // Open this regenerate menu
-        document.getElementById(`regen-menu-${index}`).classList.add('active');
-        
-        // Set up slider listener
-        const slider = document.getElementById(`regen-temp-${index}`);
-        const valueDisplay = document.getElementById(`regen-temp-val-${index}`);
-        slider.oninput = () => valueDisplay.textContent = slider.value;
+        const menu = document.getElementById(`regen-menu-${index}`);
+        if (menu) {
+            menu.classList.add('active');
+            
+            // Scroll the menu into view if needed
+            setTimeout(() => {
+                menu.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        } else {
+            console.error('Regenerate menu not found for index:', index);
+        }
     }
     
     closeRegenMenu(index) {
@@ -1476,9 +1522,15 @@ class TuneForgeUltimate {
                     
                     this.updateStats();
                     
-                    // Refresh the conversation list in the UI
+                    // Update the conversation in the UI
                     if (this.currentBin) {
-                        await this.loadConversationsForBin(this.currentBin.id);
+                        if (isNewConversation) {
+                            // For new conversations, reload the list to add it
+                            await this.loadConversationsForBin(this.currentBin.id);
+                        } else {
+                            // For existing conversations, just update the name and turn count
+                            this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
+                        }
                     }
                     
                     if (!autoSave) {
@@ -1528,9 +1580,15 @@ class TuneForgeUltimate {
             
             this.updateStats();
             
-            // Refresh the conversation list in the UI
+            // Update the conversation in the UI
             if (this.currentBin) {
-                await this.loadConversationsForBin(this.currentBin.id);
+                if (isNewConversation) {
+                    // For new conversations, reload the list to add it
+                    await this.loadConversationsForBin(this.currentBin.id);
+                } else {
+                    // For existing conversations, just update the name and turn count
+                    this.updateConversationNameInLists(conversationId, conversation.name || this.currentConversationName);
+                }
             }
             
             if (!autoSave) {
@@ -1649,7 +1707,27 @@ class TuneForgeUltimate {
             return;
         }
         
-        document.getElementById('regenerateModal').classList.add('active');
+        // Find the last assistant message's loom and open its first regenerate menu
+        const flow = document.getElementById('conversationFlow');
+        const lastLoom = flow.querySelector('.completion-loom:last-of-type');
+        
+        if (lastLoom) {
+            // Find the first completion card's regenerate button and click it
+            const firstRegenBtn = lastLoom.querySelector('.regen-btn');
+            if (firstRegenBtn) {
+                firstRegenBtn.click();
+            } else {
+                this.showNotification('No response to regenerate', 'error');
+            }
+        } else {
+            // If no loom exists, show the regenerate modal if it exists
+            const modal = document.getElementById('regenerateModal');
+            if (modal) {
+                modal.classList.add('active');
+            } else {
+                this.showNotification('No response to regenerate', 'error');
+            }
+        }
     }
     
     async regenerateResponses() {

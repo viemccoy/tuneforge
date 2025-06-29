@@ -690,18 +690,21 @@
 
 .response-editor {
     display: none;
-    margin-top: 1rem;
-    padding: 1rem;
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+    padding: 0;
     background: #000000;
-    border: 1px solid var(--matrix-green-dim);
+    border: 1px solid var(--matrix-green);
     border-radius: 4px;
     position: relative;
-    z-index: 20;
-    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+    z-index: 25;
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
+    overflow: hidden;
 }
 
 .response-editor.active {
     display: block;
+    animation: slideDown 0.3s ease-out;
 }
 
 .edit-textarea {
@@ -759,11 +762,21 @@
 .completion-card {
     position: relative;
     min-height: 300px;
+    overflow: visible !important;
 }
 
 /* Adjust action button spacing to prevent overlap */
 .action-btn {
     margin-left: 0.25rem;
+}
+
+/* Ensure menus appear outside the card bounds */
+.completion-slider {
+    overflow: visible !important;
+}
+
+.completion-track {
+    overflow: visible !important;
 }
 
 /* Regenerate button and menu styles */
@@ -786,16 +799,21 @@
 
 .regen-menu {
     display: none;
-    margin-top: 1rem;
-    padding: 1.5rem;
-    background: var(--bg-secondary);
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+    padding: 0;
+    background: #000000;
     border: 1px solid var(--matrix-green);
     border-radius: 4px;
-    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+    box-shadow: 0 0 40px rgba(0, 255, 65, 0.5);
+    position: relative;
+    z-index: 25;
+    overflow: hidden;
 }
 
 .regen-menu.active {
     display: block;
+    animation: slideDown 0.3s ease-out;
 }
 
 .regen-menu h4 {
@@ -807,10 +825,10 @@
 }
 
 .regen-controls {
+    padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 1.25rem;
 }
 
 .regen-controls .control-group {
@@ -911,6 +929,17 @@
     }
     30% {
         opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
