@@ -24,7 +24,8 @@ class TuneForgeUltimate {
         
         // Cloudflare or Socket.io mode
         this.isCloudflare = window.location.hostname.includes('pages.dev') || 
-                          window.location.hostname.includes('cloudflare');
+                          window.location.hostname.includes('cloudflare') ||
+                          window.location.hostname.includes('tuneforge.sh');
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         

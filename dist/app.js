@@ -24,7 +24,8 @@ class TuneForgeUltimate {
         
         // Cloudflare or Socket.io mode
         this.isCloudflare = window.location.hostname.includes('pages.dev') || 
-                          window.location.hostname.includes('cloudflare');
+                          window.location.hostname.includes('cloudflare') ||
+                          window.location.hostname.includes('tuneforge.sh');
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
@@ -64,6 +65,9 @@ class TuneForgeUltimate {
         const password = document.getElementById('authPassword').value;
         const errorEl = document.getElementById('authError');
         
+        console.log('Authenticating with endpoint:', `${this.apiBase}/auth`);
+        console.log('Is Cloudflare mode:', this.isCloudflare);
+        
         try {
             const response = await fetch(`${this.apiBase}/auth`, {
                 method: 'POST',
@@ -71,18 +75,21 @@ class TuneForgeUltimate {
                 body: JSON.stringify({ password })
             });
             
+            console.log('Auth response status:', response.status);
             const data = await response.json();
+            console.log('Auth response data:', data);
             
             if (data.success) {
                 this.authenticated = true;
                 this.hideAuthModal();
                 this.initialize();
             } else {
-                errorEl.textContent = 'Invalid password';
+                errorEl.textContent = data.error || 'Invalid password';
                 document.getElementById('authPassword').value = '';
             }
         } catch (error) {
-            errorEl.textContent = 'Authentication failed';
+            console.error('Auth error:', error);
+            errorEl.textContent = 'Authentication failed: ' + error.message;
         }
     }
     
