@@ -646,3 +646,96 @@
 #newConversationModal .modal-actions button {
     min-width: 100px;
 }
+
+/* Response Editing Styles */
+.response-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.completion-card:hover .response-actions {
+    opacity: 1;
+}
+
+.edit-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.edit-btn:hover {
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.response-editor {
+    display: none;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green-dim);
+    border-radius: 4px;
+}
+
+.response-editor.active {
+    display: block;
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 150px;
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.75rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    border-radius: 3px;
+    margin-bottom: 1rem;
+}
+
+.edit-textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.save-edit {
+    background: var(--matrix-green-dim);
+    color: var(--bg-primary);
+}
+
+.save-edit:hover {
+    background: var(--matrix-green);
+}
+
+.cancel-edit {
+    background: transparent;
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green-dim);
+}
+
+.cancel-edit:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+}
+
+/* Edited indicator styling */
+.completion-model:contains("(edited)") {
+    color: var(--matrix-green-bright);
+}

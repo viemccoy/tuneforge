@@ -1081,7 +1081,7 @@ class TuneForgeUltimate {
         return `
             <div class="completion-card ${index === 0 ? 'active' : ''} ${isError ? 'error' : ''}" data-index="${index}">
                 <div class="completion-meta">
-                    <div class="completion-model">${response.model || 'Unknown'}</div>
+                    <div class="completion-model">${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}</div>
                     <div class="completion-stats">
                         ${response.usage ? `${response.usage.total_tokens} tokens` : ''}
                     </div>
