@@ -142,6 +142,7 @@ class TuneForgeUltimate {
         document.getElementById('sendMessage').addEventListener('click', () => this.sendMessage());
         document.getElementById('newConversation').addEventListener('click', () => this.showNewConversationModal());
         document.getElementById('saveConversation').addEventListener('click', () => this.saveConversation());
+        document.getElementById('deleteConversation').addEventListener('click', () => this.deleteConversation());
         document.getElementById('viewConversations').addEventListener('click', () => this.showConversationsModal());
         
         // New Conversation Modal
@@ -466,12 +467,22 @@ class TuneForgeUltimate {
                 </div>
             `;
             
-            convEl.addEventListener('click', () => this.loadConversation(conv));
+            convEl.addEventListener('click', async () => {
+                // If this bin isn't currently selected, select it first
+                if (this.currentBin?.id !== binId) {
+                    const bin = this.bins.find(b => b.id === binId);
+                    if (bin) {
+                        await this.selectBin(bin, true); // Skip new conversation creation
+                    }
+                }
+                // Then load the conversation
+                this.loadConversation(conv);
+            });
             convList.appendChild(convEl);
         });
     }
     
-    async selectBin(bin) {
+    async selectBin(bin, skipNewConversation = false) {
         this.currentBin = bin;
         
         // Update UI
@@ -501,8 +512,10 @@ class TuneForgeUltimate {
             }
         }, 100);
         
-        // Start new conversation
-        this.newConversation();
+        // Start new conversation only if not loading a specific conversation
+        if (!skipNewConversation) {
+            this.newConversation();
+        }
     }
     
     async loadBinConversations() {
@@ -682,13 +695,13 @@ class TuneForgeUltimate {
         if (this.isCloudflare) {
             // Static list for Cloudflare mode
             this.availableModels = [
-                { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai' },
-                { id: 'o3', name: 'O3', provider: 'openai' },
-                { id: 'o4-mini', name: 'O4 Mini', provider: 'openai' },
-                { id: 'claude-4-opus', name: 'Claude 4 Opus', provider: 'anthropic' },
-                { id: 'claude-4-sonnet', name: 'Claude 4 Sonnet', provider: 'anthropic' },
-                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
-                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' }
+                { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
+                { id: 'o3-2025-04-16', name: 'O3', provider: 'openai' },
+                { id: 'o4-mini-2025-04-16', name: 'O4 Mini', provider: 'openai' },
+                { id: 'claude-opus-4-20250514', name: 'Opus 4', provider: 'anthropic' },
+                { id: 'claude-sonnet-4-20250514', name: 'Sonnet 4', provider: 'anthropic' },
+                { id: 'gemini-2.5-pro', name: '2.5 Pro', provider: 'google' },
+                { id: 'models/gemini-2.5-flash', name: '2.5 Flash', provider: 'google' }
             ];
         } else {
             // Request from server
@@ -771,6 +784,7 @@ class TuneForgeUltimate {
         // Update stats
         document.getElementById('turnCount').textContent = Math.floor(this.currentMessages.length / 2);
         document.getElementById('saveConversation').disabled = false;
+        document.getElementById('deleteConversation').disabled = false;
         
         // Update conversation name display
         this.updateConversationNameDisplay();
@@ -887,6 +901,7 @@ class TuneForgeUltimate {
             </div>
         `;
         document.getElementById('saveConversation').disabled = true;
+        document.getElementById('deleteConversation').disabled = true;
         document.getElementById('turnCount').textContent = '0';
         document.getElementById('userMessage').value = '';
         
@@ -1237,6 +1252,8 @@ class TuneForgeUltimate {
                         this.currentConversationId = savedConv.id;
                         this.conversations.push(savedConv);
                         this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                        // Enable delete button for new conversation
+                        document.getElementById('deleteConversation').disabled = false;
                     } else {
                         // Update existing conversation in list
                         const index = this.conversations.findIndex(c => c.id === conversationId);
@@ -1256,6 +1273,8 @@ class TuneForgeUltimate {
                         this.showNotification('Conversation saved to dataset');
                         // Don't clear the conversation on manual save, just disable the save button
                         document.getElementById('saveConversation').disabled = true;
+                        // Enable delete button after save
+                        document.getElementById('deleteConversation').disabled = false;
                     }
                 }
             } catch (error) {
@@ -1271,6 +1290,8 @@ class TuneForgeUltimate {
                 allConvs.push(conversation);
                 this.conversations.push(conversation);
                 this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                // Enable delete button for new conversation
+                document.getElementById('deleteConversation').disabled = false;
             } else {
                 // Update existing
                 const index = allConvs.findIndex(c => c.id === conversationId);
@@ -1303,7 +1324,79 @@ class TuneForgeUltimate {
             if (!autoSave) {
                 this.showNotification('Conversation saved to dataset');
                 document.getElementById('saveConversation').disabled = true;
+                // Enable delete button after save
+                document.getElementById('deleteConversation').disabled = false;
             }
+        }
+    }
+    
+    async deleteConversation() {
+        if (!this.currentBin || !this.currentConversationId) {
+            return;
+        }
+        
+        const conversationName = this.currentConversationName || 'this conversation';
+        if (!confirm(`Delete "${conversationName}"? This cannot be undone.`)) {
+            return;
+        }
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await fetch(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    // Remove from local conversations array
+                    this.conversations = this.conversations.filter(c => c.id !== this.currentConversationId);
+                    
+                    // Update bin conversation count
+                    if (this.currentBin.conversationCount > 0) {
+                        this.currentBin.conversationCount--;
+                    }
+                    
+                    // Refresh the conversation list in the UI
+                    await this.loadConversationsForBin(this.currentBin.id);
+                    
+                    // Clear current conversation and start new
+                    this.newConversation();
+                    this.updateStats();
+                    this.showNotification('Conversation deleted successfully');
+                } else {
+                    this.showNotification('Failed to delete conversation', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to delete conversation:', error);
+                this.showNotification('Failed to delete conversation', 'error');
+            }
+        } else {
+            // Local storage mode
+            const allConvs = JSON.parse(localStorage.getItem('tuneforge_conversations') || '[]');
+            const filtered = allConvs.filter(c => c.id !== this.currentConversationId);
+            localStorage.setItem('tuneforge_conversations', JSON.stringify(filtered));
+            
+            // Remove from current conversations
+            this.conversations = this.conversations.filter(c => c.id !== this.currentConversationId);
+            
+            // Update bin conversation count
+            if (this.currentBin.conversationCount > 0) {
+                this.currentBin.conversationCount--;
+                
+                const bins = JSON.parse(localStorage.getItem('tuneforge_bins') || '[]');
+                const binIndex = bins.findIndex(b => b.id === this.currentBin.id);
+                if (binIndex > -1) {
+                    bins[binIndex] = this.currentBin;
+                    localStorage.setItem('tuneforge_bins', JSON.stringify(bins));
+                }
+            }
+            
+            // Refresh the conversation list in the UI
+            await this.loadConversationsForBin(this.currentBin.id);
+            
+            // Clear current conversation and start new
+            this.newConversation();
+            this.updateStats();
+            this.showNotification('Conversation deleted successfully');
         }
     }
     
