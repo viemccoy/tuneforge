@@ -372,7 +372,7 @@ class TuneForgeUltimate {
             const binHeader = document.createElement('div');
             binHeader.className = 'bin-header';
             binHeader.innerHTML = `
-                <span class="folder-icon">▶</span>
+                <span class="folder-icon">&gt;</span>
                 <span class="bin-name">${this.escapeHtml(bin.name)}</span>
                 <span class="bin-count">${bin.conversationCount || 0}</span>
             `;
@@ -408,7 +408,7 @@ class TuneForgeUltimate {
         if (convList.style.display === 'none') {
             // Expand - load conversations if needed
             convList.style.display = 'block';
-            folderIcon.textContent = '▼';
+            folderIcon.textContent = 'v';
             binEl.classList.add('expanded');
             
             // Load conversations for this bin
@@ -416,7 +416,7 @@ class TuneForgeUltimate {
         } else {
             // Collapse
             convList.style.display = 'none';
-            folderIcon.textContent = '▶';
+            folderIcon.textContent = '>';
             binEl.classList.remove('expanded');
         }
     }
@@ -459,7 +459,7 @@ class TuneForgeUltimate {
             const date = new Date(conv.metadata.createdAt);
             
             convEl.innerHTML = `
-                <span class="file-icon">📄</span>
+                <span class="file-icon">[-]</span>
                 <div class="file-info">
                     <div class="file-name" data-conv-name="${conv.id}">${this.escapeHtml(displayName)}</div>
                     <div class="file-meta">
@@ -1173,13 +1173,13 @@ class TuneForgeUltimate {
                 </div>
                 ${!isError ? `
                 <div class="response-actions">
-                    <button class="edit-btn action-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">✏️</button>
-                    <button class="regen-btn action-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">🔄</button>
+                    <button class="edit-btn action-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">[E]</button>
+                    <button class="regen-btn action-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">[R]</button>
                 </div>
                 <div class="response-editor" id="editor-${index}">
                     <div class="editor-header">
                         <span class="editor-title">EDIT RESPONSE</span>
-                        <button class="close-btn" onclick="tuneforge.cancelEdit(${index})">×</button>
+                        <button class="close-btn" onclick="tuneforge.cancelEdit(${index})">[X]</button>
                     </div>
                     <textarea class="edit-textarea" id="edit-textarea-${index}">${escapedContent}</textarea>
                     <div class="edit-actions">
@@ -1189,8 +1189,8 @@ class TuneForgeUltimate {
                 </div>
                 <div class="regen-menu" id="regen-menu-${index}">
                     <div class="regen-header">
-                        <span class="regen-title">⚡ REGENERATE SETTINGS</span>
-                        <button class="close-btn" onclick="tuneforge.closeRegenMenu(${index})">×</button>
+                        <span class="regen-title">[REGENERATE SETTINGS]</span>
+                        <button class="close-btn" onclick="tuneforge.closeRegenMenu(${index})">[X]</button>
                     </div>
                     <div class="regen-controls">
                         <div class="regen-section">
@@ -1252,14 +1252,14 @@ class TuneForgeUltimate {
                         </div>
                     </div>
                     <div class="regen-actions">
-                        <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">⚡ REGENERATE</button>
+                        <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">&gt;&gt; REGENERATE</button>
                         <button class="btn-compact btn-secondary" onclick="tuneforge.resetRegenSettings(${index})">RESET</button>
                         <button class="btn-compact cancel-btn" onclick="tuneforge.closeRegenMenu(${index})">CANCEL</button>
                     </div>
                 </div>
                 ` : ''}
                 <div class="completion-actions">
-                    <button class="action-btn select-btn" onclick="tuneforge.selectResponse(${index})" title="Select">✓</button>
+                    <button class="action-btn select-btn" onclick="tuneforge.selectResponse(${index})" title="Select">[OK]</button>
                 </div>
             </div>
         `;

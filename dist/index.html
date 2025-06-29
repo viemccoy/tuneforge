@@ -98,7 +98,7 @@
             <div class="conversation-area">
                 <!-- No Bin Selected Message -->
                 <div id="noBinMessage" class="no-bin-message">
-                    <div class="empty-icon">📁</div>
+                    <div class="empty-icon">[/]</div>
                     <h3>SELECT OR CREATE A BIN</h3>
                     <p>Dataset bins organize conversations by system prompt</p>
                 </div>
@@ -108,7 +108,7 @@
                     <div class="conversation-header">
                         <div class="conversation-title">
                             <span id="conversationName" class="editable-title">New Conversation</span>
-                            <button id="editConversationName" class="btn-icon" title="Rename">✏️</button>
+                            <button id="editConversationName" class="btn-icon" title="Rename">[EDIT]</button>
                             <input type="text" id="conversationNameInput" class="title-input" style="display: none;">
                         </div>
                         <div class="conversation-actions">
@@ -122,7 +122,7 @@
                     <div class="loom-container">
                         <div id="conversationFlow" class="conversation-flow">
                             <div class="empty-state">
-                                <div class="empty-icon">⚡</div>
+                                <div class="empty-icon">[*]</div>
                                 <h3>Ready</h3>
                                 <p>Configure models and start conversation</p>
                             </div>
@@ -145,11 +145,11 @@
                     <div class="config-group">
                         <label for="maxTokens">Max Tokens</label>
                         <div class="token-counter">
-                            <button type="button" class="token-btn token-decrease" data-action="decrease">◀</button>
+                            <button type="button" class="token-btn token-decrease" data-action="decrease">[-]</button>
                             <div class="token-display">
                                 <span id="maxTokensValue">1000</span>
                             </div>
-                            <button type="button" class="token-btn token-increase" data-action="increase">▶</button>
+                            <button type="button" class="token-btn token-increase" data-action="increase">[+]</button>
                         </div>
                     </div>
                 </div>
@@ -178,7 +178,7 @@
                     <textarea id="userMessage" placeholder="Enter message..."></textarea>
                     <button id="sendMessage" class="btn-send">
                         <span>TRANSMIT</span>
-                        <span class="send-icon">→</span>
+                        <span class="send-icon">&gt;&gt;</span>
                     </button>
                 </div>
             </div>
@@ -246,7 +246,7 @@
             <div class="modal-content large">
                 <div class="modal-header">
                     <h3>Regenerate Options</h3>
-                    <button class="modal-close">&times;</button>
+                    <button class="modal-close">[X]</button>
                 </div>
                 <div class="modal-body">
                     <div class="regenerate-section">
@@ -367,7 +367,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>Dataset Statistics</h3>
-                    <button class="modal-close">&times;</button>
+                    <button class="modal-close">[X]</button>
                 </div>
                 <div class="modal-body">
                     <div class="stats-content">
@@ -440,7 +440,7 @@
         <div id="regeneratingOverlay" class="loading-overlay" style="display: none;">
             <div class="loading-content regeneration-loading">
                 <div class="loading-header">
-                    <div class="loading-icon">⚡</div>
+                    <div class="loading-icon">[*]</div>
                     <h3>REGENERATING RESPONSES</h3>
                 </div>
                 <div class="loading-details">
