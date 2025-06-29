@@ -106,10 +106,15 @@
                 <!-- Conversation Display -->
                 <div class="conversation-display" id="conversationDisplay" style="display: none;">
                     <div class="conversation-header">
-                        <h2>Conversation</h2>
+                        <div class="conversation-title">
+                            <span id="conversationName" class="editable-title">New Conversation</span>
+                            <button id="editConversationName" class="btn-icon" title="Rename">✏️</button>
+                            <input type="text" id="conversationNameInput" class="title-input" style="display: none;">
+                        </div>
                         <div class="conversation-actions">
                             <button id="newConversation" class="btn-ghost">NEW</button>
                             <button id="saveConversation" class="btn-success" disabled>SAVE</button>
+                            <button id="viewConversations" class="btn-ghost">VIEW ALL</button>
                         </div>
                     </div>
                     
@@ -405,6 +410,27 @@
                 </div>
                 <div class="modal-actions">
                     <button class="btn close-modal">CLOSE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Conversation Modal -->
+        <div id="newConversationModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <h2>NEW CONVERSATION</h2>
+                <div class="form-group">
+                    <label>Conversation Name</label>
+                    <input type="text" id="newConversationName" placeholder="e.g., Customer Support Training" autofocus>
+                    <div id="nameError" class="error-message" style="display: none;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea id="newConversationDescription" rows="2" placeholder="Brief description of this conversation's purpose"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmNewConversation" class="btn btn-primary">CREATE</button>
+                    <button id="cancelNewConversation" class="btn close-modal">CANCEL</button>
                 </div>
             </div>
         </div>

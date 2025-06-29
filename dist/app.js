@@ -12,6 +12,9 @@ class TuneForgeUltimate {
         this.socket = null;
         this.conversations = [];
         this.currentMessages = [];
+        this.currentConversationId = null;
+        this.currentConversationName = '';
+        this.currentConversationDescription = '';
         this.selectedModels = [];
         this.availableModels = [];
         this.savedPrompts = [];
@@ -137,9 +140,32 @@ class TuneForgeUltimate {
         
         // Conversation Controls
         document.getElementById('sendMessage').addEventListener('click', () => this.sendMessage());
-        document.getElementById('newConversation').addEventListener('click', () => this.newConversation());
+        document.getElementById('newConversation').addEventListener('click', () => this.showNewConversationModal());
         document.getElementById('saveConversation').addEventListener('click', () => this.saveConversation());
         document.getElementById('viewConversations').addEventListener('click', () => this.showConversationsModal());
+        
+        // New Conversation Modal
+        document.getElementById('confirmNewConversation').addEventListener('click', () => this.createNewConversation());
+        document.getElementById('cancelNewConversation').addEventListener('click', () => {
+            document.getElementById('newConversationModal').classList.remove('active');
+            document.getElementById('newConversationName').value = '';
+            document.getElementById('newConversationDescription').value = '';
+            document.getElementById('nameError').style.display = 'none';
+        });
+        document.getElementById('newConversationName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.createNewConversation();
+        });
+        
+        // Conversation Name Editing
+        document.getElementById('editConversationName').addEventListener('click', () => this.startEditingConversationName());
+        document.getElementById('conversationNameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.saveConversationName();
+            } else if (e.key === 'Escape') {
+                this.cancelEditingConversationName();
+            }
+        });
+        document.getElementById('conversationNameInput').addEventListener('blur', () => this.saveConversationName());
         
         // Model Selection
         document.getElementById('selectAllModels').addEventListener('click', () => this.selectAllModels());
@@ -348,9 +374,16 @@ class TuneForgeUltimate {
                 <span class="bin-name">${this.escapeHtml(bin.name)}</span>
                 <span class="bin-count">${bin.conversationCount || 0}</span>
             `;
-            binHeader.addEventListener('click', (e) => {
+            binHeader.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                this.toggleBinExpanded(bin.id);
+                
+                // Select the bin if it's not already selected
+                if (this.currentBin?.id !== bin.id) {
+                    await this.selectBin(bin);
+                } else {
+                    // If already selected, just toggle expansion
+                    this.toggleBinExpanded(bin.id);
+                }
             });
             
             // Conversation list (nested)
@@ -362,9 +395,6 @@ class TuneForgeUltimate {
             binEl.appendChild(binHeader);
             binEl.appendChild(convList);
             binList.appendChild(binEl);
-            
-            // Select bin when clicking header
-            binHeader.addEventListener('dblclick', () => this.selectBin(bin));
         });
     }
     
@@ -422,13 +452,13 @@ class TuneForgeUltimate {
             const convEl = document.createElement('div');
             convEl.className = 'conversation-file';
             
-            const preview = conv.messages.find(m => m.role === 'user')?.content || 'Empty conversation';
+            const displayName = conv.name || this.getConversationPreview(conv);
             const date = new Date(conv.metadata.createdAt);
             
             convEl.innerHTML = `
                 <span class="file-icon">📄</span>
                 <div class="file-info">
-                    <div class="file-name">${this.escapeHtml(preview.substring(0, 30))}...</div>
+                    <div class="file-name">${this.escapeHtml(displayName)}</div>
                     <div class="file-meta">
                         <span>${date.toLocaleDateString()}</span>
                         <span>${conv.metadata.turnCount} turns</span>
@@ -652,10 +682,13 @@ class TuneForgeUltimate {
         if (this.isCloudflare) {
             // Static list for Cloudflare mode
             this.availableModels = [
-                { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
-                { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' },
-                { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'anthropic' },
-                { id: 'claude-3-haiku', name: 'Claude 3 Haiku', provider: 'anthropic' }
+                { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai' },
+                { id: 'o3', name: 'O3', provider: 'openai' },
+                { id: 'o4-mini', name: 'O4 Mini', provider: 'openai' },
+                { id: 'claude-4-opus', name: 'Claude 4 Opus', provider: 'anthropic' },
+                { id: 'claude-4-sonnet', name: 'Claude 4 Sonnet', provider: 'anthropic' },
+                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' }
             ];
         } else {
             // Request from server
@@ -718,6 +751,11 @@ class TuneForgeUltimate {
     
     // Conversation Management
     loadConversation(conversation) {
+        // Set current conversation details
+        this.currentConversationId = conversation.id;
+        this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
+        this.currentConversationDescription = conversation.description || '';
+        
         // Load conversation into the UI
         this.currentMessages = conversation.messages.filter(m => m.role !== 'system');
         
@@ -734,6 +772,9 @@ class TuneForgeUltimate {
         document.getElementById('turnCount').textContent = Math.floor(this.currentMessages.length / 2);
         document.getElementById('saveConversation').disabled = false;
         
+        // Update conversation name display
+        this.updateConversationNameDisplay();
+        
         // Scroll to bottom
         flow.scrollTop = flow.scrollHeight;
         
@@ -743,8 +784,101 @@ class TuneForgeUltimate {
         this.showNotification('Conversation loaded');
     }
     
-    newConversation() {
+    getConversationPreview(conversation) {
+        const firstUserMsg = conversation.messages.find(m => m.role === 'user');
+        return firstUserMsg ? firstUserMsg.content.substring(0, 30) + '...' : 'Untitled Conversation';
+    }
+    
+    updateConversationNameDisplay() {
+        const nameEl = document.getElementById('conversationName');
+        nameEl.textContent = this.currentConversationName || 'New Conversation';
+    }
+    
+    startEditingConversationName() {
+        const nameEl = document.getElementById('conversationName');
+        const inputEl = document.getElementById('conversationNameInput');
+        const editBtn = document.getElementById('editConversationName');
+        
+        inputEl.value = this.currentConversationName || nameEl.textContent;
+        nameEl.style.display = 'none';
+        editBtn.style.display = 'none';
+        inputEl.style.display = 'inline-block';
+        inputEl.focus();
+        inputEl.select();
+    }
+    
+    saveConversationName() {
+        const inputEl = document.getElementById('conversationNameInput');
+        const nameEl = document.getElementById('conversationName');
+        const editBtn = document.getElementById('editConversationName');
+        
+        const newName = inputEl.value.trim();
+        if (newName) {
+            this.currentConversationName = newName;
+            nameEl.textContent = newName;
+            
+            // If conversation exists, save it with the new name
+            if (this.currentConversationId) {
+                this.saveConversation(true);
+            }
+        }
+        
+        inputEl.style.display = 'none';
+        nameEl.style.display = 'inline';
+        editBtn.style.display = 'inline-block';
+    }
+    
+    cancelEditingConversationName() {
+        const inputEl = document.getElementById('conversationNameInput');
+        const nameEl = document.getElementById('conversationName');
+        const editBtn = document.getElementById('editConversationName');
+        
+        inputEl.style.display = 'none';
+        nameEl.style.display = 'inline';
+        editBtn.style.display = 'inline-block';
+    }
+    
+    showNewConversationModal() {
+        if (!this.currentBin) {
+            alert('Please select a bin first');
+            return;
+        }
+        
+        document.getElementById('newConversationModal').classList.add('active');
+        document.getElementById('newConversationName').value = '';
+        document.getElementById('newConversationDescription').value = '';
+        document.getElementById('nameError').style.display = 'none';
+        setTimeout(() => document.getElementById('newConversationName').focus(), 100);
+    }
+    
+    async createNewConversation() {
+        const nameInput = document.getElementById('newConversationName').value.trim();
+        const description = document.getElementById('newConversationDescription').value.trim();
+        const errorEl = document.getElementById('nameError');
+        
+        if (!nameInput) {
+            errorEl.textContent = 'Conversation name is required';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        // Check if name already exists in current bin
+        const nameExists = this.conversations.some(conv => 
+            conv.name && conv.name.toLowerCase() === nameInput.toLowerCase()
+        );
+        
+        if (nameExists) {
+            errorEl.textContent = 'A conversation with this name already exists in this bin';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        // Create the new conversation
         this.currentMessages = [];
+        this.currentConversationId = null;
+        this.currentConversationName = nameInput;
+        this.currentConversationDescription = description;
+        
         document.getElementById('conversationFlow').innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">⚡</div>
@@ -755,7 +889,23 @@ class TuneForgeUltimate {
         document.getElementById('saveConversation').disabled = true;
         document.getElementById('turnCount').textContent = '0';
         document.getElementById('userMessage').value = '';
+        
+        this.updateConversationNameDisplay();
+        
+        // Close modal
+        document.getElementById('newConversationModal').classList.remove('active');
+        document.getElementById('newConversationName').value = '';
+        document.getElementById('newConversationDescription').value = '';
+        
+        // Focus message input
         document.getElementById('userMessage').focus();
+        
+        this.showNotification('New conversation created: ' + nameInput);
+    }
+    
+    newConversation() {
+        // This method is now just a wrapper that shows the modal
+        this.showNewConversationModal();
     }
     
     async sendMessage() {
@@ -1007,6 +1157,9 @@ class TuneForgeUltimate {
         this.activeLoom.element.replaceWith(messageEl);
         this.activeLoom = null;
         
+        // Auto-save the conversation after selecting a response
+        this.saveConversation(true);
+        
         // Focus input for next message
         document.getElementById('userMessage').focus();
     }
@@ -1038,54 +1191,99 @@ class TuneForgeUltimate {
         }
     }
     
-    async saveConversation() {
+    async saveConversation(autoSave = false) {
         if (!this.currentBin || this.currentMessages.length < 2) {
-            alert('Nothing to save');
+            if (!autoSave) alert('Nothing to save');
             return;
         }
         
+        const isNewConversation = !this.currentConversationId;
+        const conversationId = this.currentConversationId || Date.now().toString();
+        
         const conversation = {
-            id: Date.now().toString(),
+            id: conversationId,
             binId: this.currentBin.id,
+            name: this.currentConversationName || this.getConversationPreview({ messages: this.currentMessages }),
+            description: this.currentConversationDescription || '',
             messages: [
                 { role: 'system', content: document.getElementById('systemPrompt').value },
                 ...this.currentMessages
             ],
             metadata: {
-                createdAt: new Date().toISOString(),
+                createdAt: isNewConversation ? new Date().toISOString() : undefined,
+                updatedAt: new Date().toISOString(),
                 turnCount: Math.floor(this.currentMessages.length / 2),
                 models: this.selectedModels,
-                lastModel: this.currentMessages[this.currentMessages.length - 1].model
+                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model
             }
         };
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations`, {
-                    method: 'POST',
+                const endpoint = isNewConversation 
+                    ? `${this.apiBase}/conversations`
+                    : `${this.apiBase}/conversations/${conversationId}`;
+                    
+                const response = await fetch(endpoint, {
+                    method: isNewConversation ? 'POST' : 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(conversation)
                 });
                 
                 if (response.ok) {
-                    this.conversations.push(conversation);
-                    this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                    const savedConv = await response.json();
+                    
+                    if (isNewConversation) {
+                        this.currentConversationId = savedConv.id;
+                        this.conversations.push(savedConv);
+                        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                    } else {
+                        // Update existing conversation in list
+                        const index = this.conversations.findIndex(c => c.id === conversationId);
+                        if (index > -1) {
+                            this.conversations[index] = savedConv;
+                        }
+                    }
+                    
                     this.updateStats();
-                    this.showNotification('Conversation saved to dataset');
-                    this.newConversation();
+                    
+                    // Refresh the conversation list in the UI
+                    if (this.currentBin) {
+                        await this.loadConversationsForBin(this.currentBin.id);
+                    }
+                    
+                    if (!autoSave) {
+                        this.showNotification('Conversation saved to dataset');
+                        // Don't clear the conversation on manual save, just disable the save button
+                        document.getElementById('saveConversation').disabled = true;
+                    }
                 }
             } catch (error) {
                 console.error('Failed to save conversation:', error);
-                alert('Failed to save conversation');
+                if (!autoSave) alert('Failed to save conversation');
             }
         } else {
             // Local storage mode
             const allConvs = JSON.parse(localStorage.getItem('tuneforge_conversations') || '[]');
-            allConvs.push(conversation);
-            localStorage.setItem('tuneforge_conversations', JSON.stringify(allConvs));
             
-            this.conversations.push(conversation);
-            this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+            if (isNewConversation) {
+                this.currentConversationId = conversationId;
+                allConvs.push(conversation);
+                this.conversations.push(conversation);
+                this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+            } else {
+                // Update existing
+                const index = allConvs.findIndex(c => c.id === conversationId);
+                if (index > -1) {
+                    allConvs[index] = conversation;
+                }
+                const localIndex = this.conversations.findIndex(c => c.id === conversationId);
+                if (localIndex > -1) {
+                    this.conversations[localIndex] = conversation;
+                }
+            }
+            
+            localStorage.setItem('tuneforge_conversations', JSON.stringify(allConvs));
             
             // Update bin
             const bins = JSON.parse(localStorage.getItem('tuneforge_bins') || '[]');
@@ -1096,8 +1294,16 @@ class TuneForgeUltimate {
             }
             
             this.updateStats();
-            this.showNotification('Conversation saved to dataset');
-            this.newConversation();
+            
+            // Refresh the conversation list in the UI
+            if (this.currentBin) {
+                await this.loadConversationsForBin(this.currentBin.id);
+            }
+            
+            if (!autoSave) {
+                this.showNotification('Conversation saved to dataset');
+                document.getElementById('saveConversation').disabled = true;
+            }
         }
     }
     

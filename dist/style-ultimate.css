@@ -123,12 +123,17 @@
 .folder-icon {
     color: var(--matrix-green-dim);
     font-size: 0.7rem;
-    transition: transform 0.2s ease;
+    transition: all 0.2s ease;
     flex-shrink: 0;
 }
 
 .bin-folder.expanded .folder-icon {
     transform: rotate(90deg);
+}
+
+.bin-folder.active .folder-icon {
+    color: var(--matrix-green);
+    text-shadow: var(--glow-sm);
 }
 
 .bin-name {
@@ -521,4 +526,123 @@
     .bin-list {
         max-height: 120px;
     }
+}
+
+/* Conversation Name Editing Styles */
+.conversation-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.editable-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--matrix-green);
+}
+
+.btn-icon {
+    background: none;
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green-dim);
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 3px;
+}
+
+.btn-icon:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green-bright);
+}
+
+.title-input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green);
+    color: var(--matrix-green);
+    padding: 0.3rem 0.5rem;
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+    outline: none;
+    width: 300px;
+}
+
+.title-input:focus {
+    box-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+}
+
+/* New Conversation Modal Styles */
+#newConversationModal .modal-content {
+    max-width: 500px;
+}
+
+#newConversationModal h2 {
+    color: var(--matrix-green-bright);
+    font-size: 1.3rem;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+#newConversationModal .form-group {
+    margin-bottom: 1.5rem;
+}
+
+#newConversationModal label {
+    display: block;
+    color: var(--matrix-green);
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#newConversationModal input,
+#newConversationModal textarea {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.75rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+#newConversationModal input:focus,
+#newConversationModal textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+    background: rgba(0, 255, 65, 0.02);
+}
+
+#newConversationModal textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+#nameError {
+    color: #ff4444;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    border-radius: 3px;
+}
+
+#newConversationModal .modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+}
+
+#newConversationModal .modal-actions button {
+    min-width: 100px;
 }
