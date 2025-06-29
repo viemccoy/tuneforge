@@ -428,11 +428,12 @@
 .response-actions {
     position: absolute;
     top: 0.5rem;
-    right: 0.5rem;
+    right: 2.5rem; /* Moved left to avoid checkmark button */
     display: flex;
     gap: 0.25rem;
     opacity: 0;
     transition: opacity 0.3s ease;
+    z-index: 10;
 }
 
 .completion-card:hover .response-actions {
@@ -459,6 +460,14 @@
     color: var(--matrix-green);
     background: var(--hover-bg);
     box-shadow: var(--glow-sm);
+}
+
+/* Ensure completion actions (checkmark) stay on top right */
+.completion-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 5;
 }
 
 .response-editor {
@@ -651,9 +660,12 @@
 .response-actions {
     position: absolute;
     top: 0.5rem;
-    right: 0.5rem;
+    right: 2.5rem; /* Moved left to avoid checkmark button */
+    display: flex;
+    gap: 0.25rem;
     opacity: 0;
     transition: opacity 0.2s ease;
+    z-index: 10;
 }
 
 .completion-card:hover .response-actions {
@@ -680,9 +692,12 @@
     display: none;
     margin-top: 1rem;
     padding: 1rem;
-    background: var(--bg-secondary);
+    background: #000000;
     border: 1px solid var(--matrix-green-dim);
     border-radius: 4px;
+    position: relative;
+    z-index: 20;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
 }
 
 .response-editor.active {
@@ -692,7 +707,7 @@
 .edit-textarea {
     width: 100%;
     min-height: 150px;
-    background: var(--bg-primary);
+    background: #000000;
     border: 1px solid var(--matrix-green-dim);
     color: var(--matrix-green);
     padding: 0.75rem;
@@ -738,6 +753,17 @@
 /* Edited indicator styling */
 .completion-model:contains("(edited)") {
     color: var(--matrix-green-bright);
+}
+
+/* Ensure proper layout for completion card content */
+.completion-card {
+    position: relative;
+    min-height: 300px;
+}
+
+/* Adjust action button spacing to prevent overlap */
+.action-btn {
+    margin-left: 0.25rem;
 }
 
 /* Regenerate button and menu styles */
@@ -804,7 +830,7 @@
 .regen-controls input[type="number"],
 .regen-controls select,
 .regen-controls textarea {
-    background: var(--bg-primary);
+    background: #000000;
     border: 1px solid var(--matrix-green-dim);
     color: var(--matrix-green);
     padding: 0.5rem;

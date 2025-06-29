@@ -377,15 +377,12 @@ class TuneForgeUltimate {
             `;
             binHeader.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                console.log('Bin header clicked:', bin.name);
                 
                 // Select the bin if it's not already selected
                 if (this.currentBin?.id !== bin.id) {
-                    console.log('Selecting bin:', bin.id);
                     await this.selectBin(bin);
                 } else {
                     // If already selected, just toggle expansion
-                    console.log('Toggling bin expansion:', bin.id);
                     this.toggleBinExpanded(bin.id);
                 }
             });
@@ -981,28 +978,39 @@ class TuneForgeUltimate {
         // Show loading state
         this.showLoomLoading();
         
+        // Prepare model-specific parameters
+        const generateParams = {
+            binId: this.currentBin.id,
+            systemPrompt: document.getElementById('systemPrompt').value,
+            messages: this.currentMessages,
+            models: this.selectedModels
+        };
+        
+        // Check if any selected model is o3/o4-mini which requires special parameters
+        const hasO3Models = this.selectedModels.some(modelId => 
+            modelId.includes('o3') || modelId.includes('o4-mini')
+        );
+        
+        if (hasO3Models) {
+            // For o3/o4-mini models, use max_completion_tokens instead of maxTokens
+            generateParams.max_completion_tokens = maxTokens;
+            // Don't include temperature for o3 models as it's not supported
+        } else {
+            // For standard models, use regular parameters
+            generateParams.temperature = temperature;
+            generateParams.maxTokens = maxTokens;
+        }
+        
         if (this.isCloudflare) {
             // Cloudflare API call
             try {
-                console.log('Sending request with models:', this.selectedModels);
-                const requestBody = {
-                    binId: this.currentBin.id,
-                    systemPrompt: document.getElementById('systemPrompt').value,
-                    messages: this.currentMessages,
-                    models: this.selectedModels,
-                    temperature,
-                    maxTokens
-                };
-                console.log('Full request body:', requestBody);
-                
                 const response = await fetch(`${this.apiBase}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(generateParams)
                 });
                 
                 const data = await response.json();
-                console.log('Response data:', data);
                 this.handleResponses({ responses: data.responses });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
@@ -1010,13 +1018,7 @@ class TuneForgeUltimate {
             }
         } else {
             // Socket.io emit
-            this.socket.emit('generate', {
-                systemPrompt: document.getElementById('systemPrompt').value,
-                messages: this.currentMessages,
-                models: this.selectedModels,
-                temperature,
-                maxTokens
-            });
+            this.socket.emit('generate', generateParams);
         }
         
         // Update turn count
@@ -1060,18 +1062,14 @@ class TuneForgeUltimate {
     }
     
     handleResponses(data) {
-        console.log('handleResponses called with:', data);
         const flow = document.getElementById('conversationFlow');
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
         if (!data.responses || data.responses.length === 0) {
-            console.error('No responses in data:', data);
             this.showNotification('No responses generated', 'error');
             return;
         }
-        
-        console.log('Processing responses:', data.responses);
         
         // Create loom
         const loomEl = document.createElement('div');
@@ -1320,17 +1318,30 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
+                // Prepare model-specific parameters
+                const generateParams = {
+                    binId: this.currentBin.id,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    messages,
+                    models: [model]
+                };
+                
+                // Check if regenerating with o3/o4-mini model
+                const isO3Model = model.includes('o3') || model.includes('o4-mini');
+                
+                if (isO3Model) {
+                    // For o3/o4-mini models, use max_completion_tokens
+                    generateParams.max_completion_tokens = maxTokens;
+                } else {
+                    // For standard models, use regular parameters
+                    generateParams.temperature = temperature;
+                    generateParams.maxTokens = maxTokens;
+                }
+                
                 const response = await fetch(`${this.apiBase}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        binId: this.currentBin.id,
-                        systemPrompt: document.getElementById('systemPrompt').value,
-                        messages,
-                        models: [model],
-                        temperature,
-                        maxTokens
-                    })
+                    body: JSON.stringify(generateParams)
                 });
                 
                 const data = await response.json();
@@ -1634,16 +1645,34 @@ class TuneForgeUltimate {
         // Generate new responses
         if (this.isCloudflare) {
             try {
+                // Prepare base parameters
+                const generateParams = {
+                    binId: this.currentBin.id,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    messages: messagesToSend,
+                    models: this.selectedModels
+                };
+                
+                // Check if any selected model is o3/o4-mini
+                const hasO3Models = this.selectedModels.some(modelId => 
+                    modelId.includes('o3') || modelId.includes('o4-mini')
+                );
+                
+                if (hasO3Models) {
+                    // For o3/o4-mini models, only include supported parameters
+                    generateParams.max_completion_tokens = params.maxTokens;
+                    // Include variations if needed
+                    if (params.variations) generateParams.variations = params.variations;
+                    if (params.customPrompt) generateParams.customPrompt = params.customPrompt;
+                } else {
+                    // For standard models, include all parameters
+                    Object.assign(generateParams, params);
+                }
+                
                 const response = await fetch(`${this.apiBase}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        binId: this.currentBin.id,
-                        systemPrompt: document.getElementById('systemPrompt').value,
-                        messages: messagesToSend,
-                        models: this.selectedModels,
-                        ...params
-                    })
+                    body: JSON.stringify(generateParams)
                 });
                 
                 const data = await response.json();
@@ -1666,13 +1695,26 @@ class TuneForgeUltimate {
                 this.showNotification('Failed to regenerate responses', 'error');
             }
         } else {
-            // Socket.io mode
-            this.socket.emit('regenerate', {
+            // Socket.io mode - send appropriate parameters based on models
+            const hasO3Models = this.selectedModels.some(modelId => 
+                modelId.includes('o3') || modelId.includes('o4-mini')
+            );
+            
+            const socketParams = {
                 systemPrompt: document.getElementById('systemPrompt').value,
                 messages: messagesToSend,
-                models: this.selectedModels,
-                ...params
-            });
+                models: this.selectedModels
+            };
+            
+            if (hasO3Models) {
+                socketParams.max_completion_tokens = params.maxTokens;
+                if (params.variations) socketParams.variations = params.variations;
+                if (params.customPrompt) socketParams.customPrompt = params.customPrompt;
+            } else {
+                Object.assign(socketParams, params);
+            }
+            
+            this.socket.emit('regenerate', socketParams);
         }
         
         // Hide loading overlay
