@@ -86,6 +86,12 @@ class TuneForgeCloudflare {
         // Bin management
         document.getElementById('createBin').addEventListener('click', () => this.showCreateBinModal());
         document.getElementById('confirmCreateBin').addEventListener('click', () => this.createBin());
+        document.getElementById('cancelCreateBin').addEventListener('click', () => {
+            document.getElementById('createBinModal').classList.remove('active');
+            document.getElementById('binName').value = '';
+            document.getElementById('binSystemPrompt').value = '';
+            document.getElementById('binDescription').value = '';
+        });
         document.getElementById('exportBin').addEventListener('click', () => this.exportBin());
         document.getElementById('deleteBin').addEventListener('click', () => this.deleteBin());
         
@@ -110,7 +116,18 @@ class TuneForgeCloudflare {
         // Modal close buttons
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.target.closest('.modal').classList.remove('active');
+                e.preventDefault();
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                    
+                    // Clear create bin form if it's the create bin modal
+                    if (modal.id === 'createBinModal') {
+                        document.getElementById('binName').value = '';
+                        document.getElementById('binSystemPrompt').value = '';
+                        document.getElementById('binDescription').value = '';
+                    }
+                }
             });
         });
         
@@ -132,6 +149,12 @@ class TuneForgeCloudflare {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.modal.active').forEach(modal => {
                     modal.classList.remove('active');
+                    // Clear create bin form if it's the create bin modal
+                    if (modal.id === 'createBinModal') {
+                        document.getElementById('binName').value = '';
+                        document.getElementById('binSystemPrompt').value = '';
+                        document.getElementById('binDescription').value = '';
+                    }
                 });
             }
             

@@ -276,6 +276,32 @@
     font-style: italic;
 }
 
+/* Base button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
 /* Button styling consistency */
 .btn-compact.btn-primary {
     background: var(--matrix-green);
