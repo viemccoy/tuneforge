@@ -699,6 +699,7 @@ class TuneForgeUltimate {
             this.availableModels = [
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
+                { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
                 { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
                 { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
