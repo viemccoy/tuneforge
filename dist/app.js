@@ -109,6 +109,10 @@ class TuneForgeUltimate {
         // Initialize connection
         if (!this.isCloudflare) {
             this.initializeSocket();
+        } else {
+            // In Cloudflare mode, we're connected once authenticated
+            document.getElementById('connectionStatus').textContent = 'CONNECTED';
+            document.getElementById('connectionDot').classList.add('connected');
         }
         
         // Load initial data
