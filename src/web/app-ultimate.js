@@ -180,8 +180,8 @@ class TuneForgeUltimate {
         document.querySelector('.token-decrease').addEventListener('click', () => this.adjustTokens(-100));
         document.querySelector('.token-increase').addEventListener('click', () => this.adjustTokens(100));
         
-        // Regenerate
-        document.getElementById('regenerateLast').addEventListener('click', () => this.showRegenerateModal());
+        // Regenerate All
+        document.getElementById('regenerateLast').addEventListener('click', () => this.regenerateAll());
         
         // Export Actions
         document.getElementById('exportDataset').addEventListener('click', () => this.exportDataset('jsonl'));
@@ -1189,32 +1189,71 @@ class TuneForgeUltimate {
                 </div>
                 <div class="regen-menu" id="regen-menu-${index}">
                     <div class="regen-header">
-                        <span class="regen-title">REGENERATE SETTINGS</span>
+                        <span class="regen-title">⚡ REGENERATE SETTINGS</span>
                         <button class="close-btn" onclick="tuneforge.closeRegenMenu(${index})">×</button>
                     </div>
                     <div class="regen-controls">
-                        <div class="control-group">
-                            <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span></label>
-                            <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
+                        <div class="regen-section">
+                            <h4>CORE PARAMETERS</h4>
+                            <div class="control-group">
+                                <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span></label>
+                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
+                                <span class="param-help">Randomness (0=deterministic, 2=creative)</span>
+                            </div>
+                            <div class="control-group">
+                                <label>Max Tokens</label>
+                                <input type="number" id="regen-tokens-${index}" min="100" max="8000" value="${response.maxTokens || 1000}" class="token-input">
+                                <span class="param-help">Maximum response length</span>
+                            </div>
                         </div>
-                        <div class="control-group">
-                            <label>Max Tokens</label>
-                            <input type="number" id="regen-tokens-${index}" min="100" max="4000" value="${response.maxTokens || 1000}" class="token-input">
+                        
+                        <div class="regen-section">
+                            <h4>ADVANCED OPTIONS</h4>
+                            <div class="control-group">
+                                <label>Top P <span class="value-display" id="regen-top-p-val-${index}">1.0</span></label>
+                                <input type="range" id="regen-top-p-${index}" min="0" max="1" step="0.05" value="1" oninput="document.getElementById('regen-top-p-val-${index}').textContent = this.value">
+                                <span class="param-help">Nucleus sampling threshold</span>
+                            </div>
+                            <div class="control-group">
+                                <label>Frequency Penalty <span class="value-display" id="regen-freq-val-${index}">0.0</span></label>
+                                <input type="range" id="regen-freq-${index}" min="-2" max="2" step="0.1" value="0" oninput="document.getElementById('regen-freq-val-${index}').textContent = this.value">
+                                <span class="param-help">Reduce repetition</span>
+                            </div>
+                            <div class="control-group">
+                                <label>Presence Penalty <span class="value-display" id="regen-pres-val-${index}">0.0</span></label>
+                                <input type="range" id="regen-pres-${index}" min="-2" max="2" step="0.1" value="0" oninput="document.getElementById('regen-pres-val-${index}').textContent = this.value">
+                                <span class="param-help">Encourage new topics</span>
+                            </div>
                         </div>
-                        <div class="control-group">
-                            <label>Model</label>
-                            <select id="regen-model-${index}" class="model-select">
-                                <option value="same">Same Model (${response.model})</option>
-                                ${this.availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="control-group">
-                            <label>Custom Instructions</label>
-                            <textarea id="regen-instructions-${index}" class="instructions-textarea" placeholder="Add specific instructions for regeneration..."></textarea>
+                        
+                        <div class="regen-section">
+                            <h4>MODEL & INSTRUCTIONS</h4>
+                            <div class="control-group">
+                                <label>Model</label>
+                                <select id="regen-model-${index}" class="model-select">
+                                    <option value="same">Same Model (${response.model})</option>
+                                    <option value="">── Select Different Model ──</option>
+                                    ${this.availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>Custom Instructions</label>
+                                <textarea id="regen-instructions-${index}" class="instructions-textarea" placeholder="e.g., Make the response more concise, add examples, focus on practical implementation..."></textarea>
+                            </div>
+                            <div class="control-group">
+                                <label>Variations</label>
+                                <select id="regen-variations-${index}" class="model-select">
+                                    <option value="1">1 response</option>
+                                    <option value="3">3 responses</option>
+                                    <option value="5">5 responses</option>
+                                </select>
+                                <span class="param-help">Generate multiple alternatives</span>
+                            </div>
                         </div>
                     </div>
                     <div class="regen-actions">
-                        <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">REGENERATE</button>
+                        <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">⚡ REGENERATE</button>
+                        <button class="btn-compact btn-secondary" onclick="tuneforge.resetRegenSettings(${index})">RESET</button>
                         <button class="btn-compact cancel-btn" onclick="tuneforge.closeRegenMenu(${index})">CANCEL</button>
                     </div>
                 </div>
@@ -1372,7 +1411,28 @@ class TuneForgeUltimate {
     }
     
     closeRegenMenu(index) {
-        document.getElementById(`regen-menu-${index}`).classList.remove('active');
+        const menu = document.getElementById(`regen-menu-${index}`);
+        if (menu) {
+            menu.classList.remove('active');
+        }
+    }
+    
+    resetRegenSettings(index) {
+        // Reset all settings to defaults
+        document.getElementById(`regen-temp-${index}`).value = 0.7;
+        document.getElementById(`regen-temp-val-${index}`).textContent = '0.7';
+        document.getElementById(`regen-tokens-${index}`).value = 1000;
+        document.getElementById(`regen-top-p-${index}`).value = 1.0;
+        document.getElementById(`regen-top-p-val-${index}`).textContent = '1.0';
+        document.getElementById(`regen-freq-${index}`).value = 0;
+        document.getElementById(`regen-freq-val-${index}`).textContent = '0.0';
+        document.getElementById(`regen-pres-${index}`).value = 0;
+        document.getElementById(`regen-pres-val-${index}`).textContent = '0.0';
+        document.getElementById(`regen-model-${index}`).value = 'same';
+        document.getElementById(`regen-instructions-${index}`).value = '';
+        document.getElementById(`regen-variations-${index}`).value = '1';
+        
+        this.showNotification('Settings reset to defaults');
     }
     
     async regenerateSingle(index) {
@@ -1391,12 +1451,20 @@ class TuneForgeUltimate {
         
         // Show loading state on this card
         const card = document.querySelector(`.completion-card[data-index="${index}"]`);
+        if (!card) {
+            console.error('Card not found for index:', index);
+            return;
+        }
         card.classList.add('regenerating');
         
-        // Build messages with optional custom instructions
-        const messages = [...this.currentMessages];
+        // Get messages up to the point where this loom was generated
+        // This is all messages except the ones in the current loom
+        const loomStartIndex = this.currentMessages.length;
+        const messagesToSend = [...this.currentMessages];
+        
+        // Add custom instructions if provided
         if (customInstructions) {
-            messages.push({ role: 'system', content: customInstructions });
+            messagesToSend.push({ role: 'system', content: customInstructions });
         }
         
         if (this.isCloudflare) {
@@ -1405,7 +1473,7 @@ class TuneForgeUltimate {
                 const generateParams = {
                     binId: this.currentBin.id,
                     systemPrompt: document.getElementById('systemPrompt').value,
-                    messages,
+                    messages: messagesToSend,
                     models: [model]
                 };
                 
@@ -1438,11 +1506,27 @@ class TuneForgeUltimate {
                     
                     // Update the card content
                     this.updateCompletionCard(index);
+                    this.showNotification('Response regenerated successfully');
+                } else {
+                    throw new Error('No response received');
                 }
             } catch (error) {
                 console.error('Regeneration failed:', error);
                 this.showNotification('Failed to regenerate response', 'error');
             }
+        } else {
+            // Socket.io mode
+            // Store the index for when we receive the response
+            this.pendingRegenerationIndex = index;
+            
+            this.socket.emit('generate', {
+                systemPrompt: document.getElementById('systemPrompt').value,
+                messages: messagesToSend,
+                models: [model],
+                temperature,
+                maxTokens,
+                isSingleRegeneration: true
+            });
         }
         
         card.classList.remove('regenerating');
@@ -1702,32 +1786,99 @@ class TuneForgeUltimate {
     }
     
     // Regeneration
-    showRegenerateModal() {
-        if (this.currentMessages.length < 2) {
-            alert('No messages to regenerate');
+    async regenerateAll() {
+        // Find the last assistant message
+        const lastAssistantIndex = this.currentMessages.findLastIndex(m => m.role === 'assistant');
+        if (lastAssistantIndex === -1) {
+            this.showNotification('No assistant message to regenerate', 'error');
             return;
         }
         
-        // Find the last assistant message's loom and open its first regenerate menu
-        const flow = document.getElementById('conversationFlow');
-        const lastLoom = flow.querySelector('.completion-loom:last-of-type');
+        // Get messages up to (but not including) the last assistant message
+        const messagesToSend = this.currentMessages.slice(0, lastAssistantIndex);
         
-        if (lastLoom) {
-            // Find the first completion card's regenerate button and click it
-            const firstRegenBtn = lastLoom.querySelector('.regen-btn');
-            if (firstRegenBtn) {
-                firstRegenBtn.click();
-            } else {
-                this.showNotification('No response to regenerate', 'error');
+        if (messagesToSend.length === 0) {
+            this.showNotification('No messages to regenerate', 'error');
+            return;
+        }
+        
+        // Show loading state
+        this.showNotification('Regenerating all responses...');
+        
+        // Get current parameters
+        const temperature = parseFloat(document.getElementById('temperature').value);
+        const maxTokens = parseInt(document.getElementById('maxTokensValue').textContent);
+        
+        // Remove the last assistant message from UI
+        const flow = document.getElementById('conversationFlow');
+        const messageBlocks = flow.querySelectorAll('.message-block');
+        let lastAssistantBlock = null;
+        
+        // Find and remove the last assistant message block
+        for (let i = messageBlocks.length - 1; i >= 0; i--) {
+            if (messageBlocks[i].querySelector('.message.assistant')) {
+                lastAssistantBlock = messageBlocks[i];
+                break;
+            }
+        }
+        
+        if (lastAssistantBlock) {
+            lastAssistantBlock.remove();
+        }
+        
+        // Remove from messages array
+        this.currentMessages = this.currentMessages.slice(0, lastAssistantIndex);
+        
+        // Show loading loom
+        this.showLoomLoading();
+        
+        // Regenerate with all selected models
+        if (this.isCloudflare) {
+            try {
+                const generateParams = {
+                    binId: this.currentBin.id,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    messages: messagesToSend,
+                    models: this.selectedModels
+                };
+                
+                // Check if any selected model is o3/o4-mini
+                const hasO3Models = this.selectedModels.some(modelId => 
+                    modelId.includes('o3') || modelId.includes('o4-mini')
+                );
+                
+                if (hasO3Models) {
+                    generateParams.max_completion_tokens = maxTokens;
+                } else {
+                    generateParams.temperature = temperature;
+                    generateParams.maxTokens = maxTokens;
+                }
+                
+                const response = await fetch(`${this.apiBase}/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(generateParams)
+                });
+                
+                const data = await response.json();
+                this.handleResponses({ responses: data.responses });
+                
+            } catch (error) {
+                console.error('Failed to regenerate:', error);
+                this.showNotification('Failed to regenerate responses', 'error');
+                // Remove loading loom
+                const loadingLoom = flow.querySelector('.loading-loom');
+                if (loadingLoom) loadingLoom.remove();
             }
         } else {
-            // If no loom exists, show the regenerate modal if it exists
-            const modal = document.getElementById('regenerateModal');
-            if (modal) {
-                modal.classList.add('active');
-            } else {
-                this.showNotification('No response to regenerate', 'error');
-            }
+            // Socket.io mode
+            this.socket.emit('generate', {
+                systemPrompt: document.getElementById('systemPrompt').value,
+                messages: messagesToSend,
+                models: this.selectedModels,
+                temperature,
+                maxTokens
+            });
         }
     }
     

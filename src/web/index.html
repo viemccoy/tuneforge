@@ -5,10 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔥 TuneForge - Dataset Builder</title>
     <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="style-ultimate.css">
 </head>
 <body>
     <div class="app-container">
+        <!-- Auth Modal -->
+        <div id="authModal" class="modal active">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content auth-modal">
+                <h2>TUNEFORGE ACCESS</h2>
+                <div class="auth-form">
+                    <input type="password" id="authPassword" placeholder="Enter password..." class="auth-input" autofocus>
+                    <button id="authSubmit" class="btn btn-primary">AUTHENTICATE</button>
+                    <div id="authError" class="error-message"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Header -->
         <header class="header">
             <div class="header-content">
@@ -21,6 +34,10 @@
                         <span id="connectionStatus">CONNECTING...</span>
                     </div>
                     <div class="status-item">
+                        <span class="status-label">BIN:</span>
+                        <span class="status-value" id="currentBinName">NO BIN SELECTED</span>
+                    </div>
+                    <div class="status-item">
                         <span class="status-label">DATASET:</span>
                         <span class="status-value" id="datasetCount">0</span>
                     </div>
@@ -30,8 +47,27 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Configuration Panel -->
+            <!-- Configuration Panel with Bins -->
             <aside class="sidebar">
+                <!-- Bin Management Section (Collapsible) -->
+                <div class="sidebar-section collapsible">
+                    <h3 class="section-toggle" id="binSectionToggle">
+                        <span class="toggle-icon">▼</span>
+                        Dataset Bins
+                        <button id="createBin" class="btn-compact btn-primary" style="margin-left: auto;">+</button>
+                    </h3>
+                    <div class="section-content" id="binSectionContent">
+                        <div id="binList" class="bin-list">
+                            <div class="empty-state">No bins created yet</div>
+                        </div>
+                        <div id="binActions" class="bin-actions" style="display: none;">
+                            <button id="exportBin" class="btn-compact">EXPORT BIN</button>
+                            <button id="deleteBin" class="btn-compact btn-danger">DELETE BIN</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Section -->
                 <div class="sidebar-section">
                     <h3>Configuration</h3>
                     <div class="config-group">
@@ -60,13 +96,26 @@
 
             <!-- Conversation Area -->
             <div class="conversation-area">
+                <!-- No Bin Selected Message -->
+                <div id="noBinMessage" class="no-bin-message">
+                    <div class="empty-icon">📁</div>
+                    <h3>SELECT OR CREATE A BIN</h3>
+                    <p>Dataset bins organize conversations by system prompt</p>
+                </div>
+
                 <!-- Conversation Display -->
-                <div class="conversation-display">
+                <div class="conversation-display" id="conversationDisplay" style="display: none;">
                     <div class="conversation-header">
-                        <h2>Conversation</h2>
+                        <div class="conversation-title">
+                            <span id="conversationName" class="editable-title">New Conversation</span>
+                            <button id="editConversationName" class="btn-icon" title="Rename">✏️</button>
+                            <input type="text" id="conversationNameInput" class="title-input" style="display: none;">
+                        </div>
                         <div class="conversation-actions">
                             <button id="newConversation" class="btn-ghost">NEW</button>
                             <button id="saveConversation" class="btn-success" disabled>SAVE</button>
+                            <button id="deleteConversation" class="btn-danger btn-ghost" disabled>DELETE CONVO</button>
+                            <button id="viewConversations" class="btn-ghost">VIEW ALL</button>
                         </div>
                     </div>
                     
@@ -83,7 +132,7 @@
             </div>
 
             <!-- Controls Panel -->
-            <aside class="controls-panel">
+            <aside class="controls-panel" id="controlsPanel" style="display: none;">
                 <div class="control-section">
                     <h3>Parameters</h3>
                     <div class="config-group">
@@ -99,7 +148,6 @@
                             <button type="button" class="token-btn token-decrease" data-action="decrease">◀</button>
                             <div class="token-display">
                                 <span id="maxTokensValue">1000</span>
-                                <input type="number" id="maxTokens" min="1" max="8000" value="1000" style="display: none;">
                             </div>
                             <button type="button" class="token-btn token-increase" data-action="increase">▶</button>
                         </div>
@@ -107,28 +155,19 @@
                 </div>
 
                 <div class="control-section">
-                    <h3>Generation</h3>
+                    <h3>Actions</h3>
                     <div class="action-buttons">
-                        <button id="regenerateAll" class="btn-secondary">REGEN ALL</button>
-                        <button id="quickSave" class="btn-secondary">QUICK SAVE</button>
+                        <button id="regenerateLast" class="btn-secondary">REGENERATE ALL</button>
+                        <button id="viewConversations" class="btn-secondary">VIEW ALL</button>
                     </div>
                 </div>
             </aside>
 
-
             <!-- Input Area -->
-            <div class="input-area">
+            <div class="input-area" id="inputArea" style="display: none;">
                 <div class="status-info">
                     <div class="status-item">
-                        <span class="status-label">Session:</span>
-                        <span class="status-value" id="sessionStatus">Ready</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Models:</span>
-                        <span class="status-value" id="activeModels">0</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Turn:</span>
+                        <span>Turn:</span>
                         <span class="status-value" id="turnCount">0</span>
                     </div>
                 </div>
@@ -177,138 +216,263 @@
             </div>
         </main>
 
-        <!-- Modals -->
+        <!-- Create Bin Modal -->
+        <div id="createBinModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <h2>CREATE NEW BIN</h2>
+                <div class="form-group">
+                    <label>Bin Name</label>
+                    <input type="text" id="binName" placeholder="e.g., Customer Support Agent">
+                </div>
+                <div class="form-group">
+                    <label>System Prompt</label>
+                    <textarea id="binSystemPrompt" rows="4" placeholder="You are a helpful customer support agent..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <input type="text" id="binDescription" placeholder="Dataset for customer support scenarios">
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmCreateBin" class="btn btn-primary">CREATE</button>
+                    <button id="cancelCreateBin" class="btn close-modal">CANCEL</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Regenerate Options Modal -->
         <div id="regenerateModal" class="modal">
             <div class="modal-backdrop"></div>
             <div class="modal-content large">
                 <div class="modal-header">
-                    <h3>REGENERATE OPTIONS</h3>
-                    <button class="modal-close">×</button>
+                    <h3>Regenerate Options</h3>
+                    <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="regenerate-section">
-                        <h4>CORE PARAMETERS</h4>
+                        <h4>Parameters</h4>
                         <div class="config-row">
                             <div class="config-group">
-                                <label for="newTemperature">Temperature</label>
+                                <label for="regenTemperature">Temperature</label>
                                 <div class="slider-container">
-                                    <input type="range" id="newTemperature" min="0" max="2" step="0.1" value="0.7">
-                                    <span class="slider-value" id="newTemperatureValue">0.7</span>
+                                    <input type="range" id="regenTemperature" min="0" max="2" step="0.1" value="0.7">
+                                    <span class="slider-value" id="regenTempValue">0.7</span>
                                 </div>
-                                <small class="param-help">Controls randomness (0.0 = deterministic, 2.0 = very creative)</small>
+                                <span class="param-help">Higher values = more creative/random</span>
                             </div>
                             <div class="config-group">
-                                <label for="newMaxTokens">Max Tokens</label>
-                                <input type="number" id="newMaxTokens" min="1" max="8000" value="1000">
-                                <small class="param-help">Maximum response length</small>
+                                <label for="regenMaxTokens">Max Tokens</label>
+                                <input type="number" id="regenMaxTokens" min="1" max="4000" value="1000">
+                                <span class="param-help">Maximum response length</span>
                             </div>
                         </div>
-                        
                         <div class="config-row">
                             <div class="config-group">
-                                <label for="newTopP">Top P (nucleus sampling)</label>
+                                <label for="regenTopP">Top P</label>
                                 <div class="slider-container">
-                                    <input type="range" id="newTopP" min="0" max="1" step="0.05" value="1">
-                                    <span class="slider-value" id="newTopPValue">1.0</span>
+                                    <input type="range" id="regenTopP" min="0" max="1" step="0.1" value="1">
+                                    <span class="slider-value" id="regenTopPValue">1.0</span>
                                 </div>
-                                <small class="param-help">Alternative to temperature (0.1 = focused, 1.0 = full range)</small>
+                                <span class="param-help">Nucleus sampling threshold</span>
                             </div>
                             <div class="config-group">
-                                <label for="newFrequencyPenalty">Frequency Penalty</label>
-                                <div class="slider-container">
-                                    <input type="range" id="newFrequencyPenalty" min="-2" max="2" step="0.1" value="0">
-                                    <span class="slider-value" id="newFrequencyPenaltyValue">0.0</span>
-                                </div>
-                                <small class="param-help">Reduces repetition (-2.0 to 2.0)</small>
+                                <label for="regenVariations">Variations</label>
+                                <input type="number" id="regenVariations" min="1" max="10" value="3">
+                                <span class="param-help">Number of alternative responses</span>
                             </div>
                         </div>
-
                         <div class="config-row">
                             <div class="config-group">
-                                <label for="newPresencePenalty">Presence Penalty</label>
+                                <label for="regenFreqPenalty">Frequency Penalty</label>
                                 <div class="slider-container">
-                                    <input type="range" id="newPresencePenalty" min="-2" max="2" step="0.1" value="0">
-                                    <span class="slider-value" id="newPresencePenaltyValue">0.0</span>
+                                    <input type="range" id="regenFreqPenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="regenFreqValue">0.0</span>
                                 </div>
-                                <small class="param-help">Encourages new topics (-2.0 to 2.0)</small>
+                                <span class="param-help">Reduce repetition (-2 to 2)</span>
                             </div>
                             <div class="config-group">
-                                <label for="newSeed">Seed (optional)</label>
-                                <input type="number" id="newSeed" placeholder="Random seed for reproducibility">
-                                <small class="param-help">Set for reproducible outputs</small>
+                                <label for="regenPresPenalty">Presence Penalty</label>
+                                <div class="slider-container">
+                                    <input type="range" id="regenPresPenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="regenPresValue">0.0</span>
+                                </div>
+                                <span class="param-help">Encourage new topics (-2 to 2)</span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="regenerate-section">
-                        <h4>SYSTEM PROMPT MODIFICATION</h4>
+                        <h4>Options</h4>
                         <div class="config-group">
-                            <textarea id="newSystemPrompt" placeholder="Override system prompt for this regeneration..." rows="3"></textarea>
-                            <small class="param-help">Leave empty to use current system prompt</small>
+                            <label>
+                                <input type="checkbox" id="regenSystemPrompt" checked>
+                                Allow system prompt modification
+                            </label>
                         </div>
-                    </div>
-
-                    <div class="regenerate-section">
-                        <h4>MODEL SELECTION</h4>
-                        <div id="regenerateModelSelection" class="model-selection">
-                            <!-- Models populated by JS -->
-                        </div>
-                        <small class="param-help">Select models to regenerate responses from</small>
-                    </div>
-
-                    <div class="regenerate-section">
-                        <h4>RESPONSE VARIATIONS</h4>
                         <div class="config-group">
-                            <label for="responseCount">Number of Responses</label>
-                            <select id="responseCount">
-                                <option value="1">1 response per model</option>
-                                <option value="2">2 responses per model</option>
-                                <option value="3">3 responses per model</option>
-                                <option value="5">5 responses per model</option>
+                            <label>
+                                <input type="checkbox" id="regenIncludeOriginal">
+                                Include original response in variations
+                            </label>
+                        </div>
+                        <div class="config-group">
+                            <label>Model Selection</label>
+                            <select id="regenModel">
+                                <option value="all">All Selected Models</option>
+                                <option value="specific">Specific Model...</option>
                             </select>
-                            <small class="param-help">Generate multiple variations for comparison</small>
                         </div>
-                        
                     </div>
-
-                    <div class="modal-actions">
-                        <button id="applyRegenerate" class="btn-primary">REGENERATE</button>
-                        <button id="resetToDefaults" class="btn-secondary">RESET DEFAULTS</button>
-                        <button class="btn-secondary modal-close">CANCEL</button>
+                    
+                    <div class="regenerate-section">
+                        <h4>Prompt Variations</h4>
+                        <div class="prompt-suggestions">
+                            <div class="prompt-suggestion" data-prompt="Make the response more concise">More Concise</div>
+                            <div class="prompt-suggestion" data-prompt="Make the response more detailed">More Detailed</div>
+                            <div class="prompt-suggestion" data-prompt="Make the response more formal">More Formal</div>
+                            <div class="prompt-suggestion" data-prompt="Make the response more casual">More Casual</div>
+                            <div class="prompt-suggestion" data-prompt="Add examples to illustrate points">Add Examples</div>
+                            <div class="prompt-suggestion" data-prompt="Focus on practical implementation">Practical Focus</div>
+                        </div>
+                        <div class="config-group">
+                            <label for="customPromptVariation">Custom Variation</label>
+                            <textarea id="customPromptVariation" rows="2" placeholder="Enter custom instructions for regeneration..."></textarea>
+                        </div>
                     </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmRegenerate" class="btn btn-primary">REGENERATE</button>
+                    <button class="btn close-modal">CANCEL</button>
                 </div>
             </div>
         </div>
 
-        <!-- Statistics Modal -->
+        <!-- Conversations Modal -->
+        <div id="conversationsModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content wide">
+                <h2>BIN CONVERSATIONS</h2>
+                <div id="conversationsList" class="conversations-list">
+                    <!-- Conversations will be populated here -->
+                </div>
+                <div class="modal-actions">
+                    <button class="btn close-modal">CLOSE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Modal -->
         <div id="statsModal" class="modal">
             <div class="modal-backdrop"></div>
-            <div class="modal-content large">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h3>DATASET STATISTICS</h3>
-                    <button class="modal-close">×</button>
+                    <h3>Dataset Statistics</h3>
+                    <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="statsContent" class="stats-content">
-                        <!-- Stats populated by JS -->
+                    <div class="stats-content">
+                        <div class="stats-section">
+                            <h4>General</h4>
+                            <div class="stat-item">
+                                <span>Total Conversations</span>
+                                <span class="stat-value" id="statTotalConv">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>Total Messages</span>
+                                <span class="stat-value" id="statTotalMsg">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>Avg Messages/Conv</span>
+                                <span class="stat-value" id="statAvgMsg">0</span>
+                            </div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>Tokens</h4>
+                            <div class="stat-item">
+                                <span>Total Tokens</span>
+                                <span class="stat-value" id="statTotalTokens">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>User Tokens</span>
+                                <span class="stat-value" id="statUserTokens">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>Assistant Tokens</span>
+                                <span class="stat-value" id="statAssistantTokens">0</span>
+                            </div>
+                        </div>
+                        <div class="stats-section">
+                            <h4>Models</h4>
+                            <div id="modelStats" class="model-stats">
+                                <!-- Model stats populated by JS -->
+                            </div>
+                        </div>
                     </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn close-modal">CLOSE</button>
                 </div>
             </div>
         </div>
 
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-            <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <p id="loadingText">PROCESSING...</p>
+        <!-- New Conversation Modal -->
+        <div id="newConversationModal" class="modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <h2>NEW CONVERSATION</h2>
+                <div class="form-group">
+                    <label>Conversation Name</label>
+                    <input type="text" id="newConversationName" placeholder="e.g., Customer Support Training" autofocus>
+                    <div id="nameError" class="error-message" style="display: none;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea id="newConversationDescription" rows="2" placeholder="Brief description of this conversation's purpose"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmNewConversation" class="btn btn-primary">CREATE</button>
+                    <button id="cancelNewConversation" class="btn close-modal">CANCEL</button>
+                </div>
             </div>
         </div>
 
-        <!-- Notifications -->
-        <div id="notifications" class="notifications"></div>
-
+        <!-- Loading/Regenerating Overlay -->
+        <div id="regeneratingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content regeneration-loading">
+                <div class="loading-header">
+                    <div class="loading-icon">⚡</div>
+                    <h3>REGENERATING RESPONSES</h3>
+                </div>
+                <div class="loading-details">
+                    <div class="loading-row">
+                        <span>Temperature:</span>
+                        <span class="loading-value" id="loadingTemp">0.7</span>
+                    </div>
+                    <div class="loading-row">
+                        <span>Variations:</span>
+                        <span class="loading-value" id="loadingVariations">3</span>
+                    </div>
+                    <div class="loading-row">
+                        <span>Models:</span>
+                        <span class="loading-value" id="loadingModels">All</span>
+                    </div>
+                </div>
+                <div class="loading-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="regenProgress"></div>
+                    </div>
+                    <div class="progress-text">
+                        Processing variations
+                        <span class="loading-dots">
+                            <span>.</span>
+                            <span>.</span>
+                            <span>.</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
