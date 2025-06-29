@@ -27,6 +27,12 @@ export async function onRequestPost(context) {
     
     const google = env.GOOGLE_API_KEY ? new GoogleGenerativeAI(env.GOOGLE_API_KEY) : null;
     
+    // Initialize OpenRouter client for Deepseek models
+    const openrouter = env.OPENROUTER_API_KEY ? new OpenAI({
+      apiKey: env.OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1'
+    }) : null;
+    
     // Generate responses in parallel
     const responsePromises = models.map(async (modelId) => {
       try {
@@ -78,6 +84,23 @@ export async function onRequestPost(context) {
               completion_tokens: completion.usage.output_tokens,
               total_tokens: completion.usage.input_tokens + completion.usage.output_tokens
             }
+          };
+        } else if (modelId.startsWith('deepseek') && openrouter) {
+          // Handle Deepseek models through OpenRouter
+          const completion = await openrouter.chat.completions.create({
+            model: modelId,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages
+            ],
+            temperature: temperature || 0.7,
+            max_tokens: maxTokens || 1000
+          });
+          
+          return {
+            model: modelId,
+            content: completion.choices[0].message.content,
+            usage: completion.usage
           };
         } else if ((modelId.includes('gemini') || modelId.startsWith('models/gemini')) && google) {
           // Handle Google Gemini models
