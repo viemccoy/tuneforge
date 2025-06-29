@@ -660,9 +660,9 @@
 .response-actions {
     position: absolute;
     top: 0.5rem;
-    right: 2.5rem; /* Moved left to avoid checkmark button */
+    right: 3rem; /* Moved left to avoid checkmark button */
     display: flex;
-    gap: 0.25rem;
+    gap: 0.5rem;
     opacity: 0;
     transition: opacity 0.2s ease;
     z-index: 10;
@@ -672,39 +672,63 @@
     opacity: 1;
 }
 
-.edit-btn {
-    background: var(--bg-secondary);
+.edit-btn, .regen-btn {
+    background: #000000;
     border: 1px solid var(--matrix-green-dim);
     color: var(--matrix-green);
-    padding: 0.3rem 0.5rem;
+    padding: 0.25rem 0.4rem;
     cursor: pointer;
     border-radius: 3px;
-    font-size: 0.9rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     transition: all 0.3s ease;
+    min-width: 40px;
+    text-align: center;
 }
 
-.edit-btn:hover {
+.edit-btn:hover, .regen-btn:hover {
     border-color: var(--matrix-green);
     background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
 }
 
 .response-editor {
     display: none;
-    margin-top: -0.5rem;
+    margin-top: 0.5rem;
     margin-bottom: 1rem;
-    padding: 0;
+    padding: 1.25rem;
     background: #000000;
-    border: 1px solid var(--matrix-green);
+    border: 2px solid var(--matrix-green);
     border-radius: 4px;
     position: relative;
     z-index: 25;
     box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
-    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .response-editor.active {
     display: block;
     animation: slideDown 0.3s ease-out;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--matrix-green-dim);
+}
+
+.editor-title {
+    color: var(--matrix-green-bright);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .edit-textarea {
@@ -719,6 +743,7 @@
     resize: vertical;
     border-radius: 3px;
     margin-bottom: 1rem;
+    box-sizing: border-box;
 }
 
 .edit-textarea:focus {
@@ -731,6 +756,7 @@
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
+    padding-top: 0.5rem;
 }
 
 .save-edit {
@@ -763,6 +789,7 @@
     position: relative;
     min-height: 300px;
     overflow: visible !important;
+    padding-bottom: 2rem; /* Add space for menus */
 }
 
 /* Adjust action button spacing to prevent overlap */
@@ -1080,23 +1107,26 @@
 }
 
 .close-btn {
-    background: none;
-    border: none;
+    background: #000000;
+    border: 1px solid var(--matrix-green-dim);
     color: var(--matrix-green);
-    font-size: 1.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
+    padding: 0.2rem 0.4rem;
+    border-radius: 2px;
+    min-width: 30px;
+    height: auto;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
 .close-btn:hover {
     color: var(--matrix-green-bright);
-    transform: rotate(90deg);
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
 }
 
 .token-input,

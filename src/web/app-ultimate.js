@@ -1173,8 +1173,8 @@ class TuneForgeUltimate {
                 </div>
                 ${!isError ? `
                 <div class="response-actions">
-                    <button class="edit-btn action-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">[E]</button>
-                    <button class="regen-btn action-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">[R]</button>
+                    <button class="edit-btn action-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">EDIT</button>
+                    <button class="regen-btn action-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">REGEN</button>
                 </div>
                 <div class="response-editor" id="editor-${index}">
                     <div class="editor-header">
