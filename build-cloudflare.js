@@ -15,17 +15,19 @@ if (!fs.existsSync(distDir)) {
 
 // Copy static files
 const staticFiles = [
-  'src/web/index-final.html',
-  'src/web/app-cloudflare.js',
+  'src/web/index-ultimate.html',
+  'src/web/app-ultimate.js',
   'src/web/style.css',
   'src/web/style-bins.css',
-  'src/web/style-final.css'
+  'src/web/style-final.css',
+  'src/web/style-ultimate.css'
 ];
 
 staticFiles.forEach(file => {
   const src = path.join(__dirname, file);
   const filename = path.basename(file);
-  const dest = path.join(distDir, filename === 'index-final.html' ? 'index.html' : filename);
+  const dest = path.join(distDir, filename === 'index-ultimate.html' ? 'index.html' : 
+                         filename === 'app-ultimate.js' ? 'app.js' : filename);
   
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, dest);
@@ -35,20 +37,10 @@ staticFiles.forEach(file => {
   }
 });
 
-// Combine CSS files
-const mainCSS = fs.readFileSync(path.join(__dirname, 'src/web/style.css'), 'utf8');
-const binsCSS = fs.readFileSync(path.join(__dirname, 'src/web/style-bins.css'), 'utf8');
-const finalCSS = fs.readFileSync(path.join(__dirname, 'src/web/style-final.css'), 'utf8');
-fs.writeFileSync(path.join(distDir, 'style.css'), mainCSS + '\n\n' + binsCSS + '\n\n' + finalCSS);
-console.log('✓ Combined CSS files');
+// Don't combine CSS files - keep them separate for the ultimate version
+console.log('✓ CSS files copied separately');
 
-// Update HTML to use correct JS file
-let html = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
-html = html.replace('app-cloudflare.js', 'app.js');
-fs.writeFileSync(path.join(distDir, 'index.html'), html);
-
-// Rename JS file
-fs.renameSync(path.join(distDir, 'app-cloudflare.js'), path.join(distDir, 'app.js'));
-console.log('✓ Updated HTML references');
+// No need to rename files or update references - already handled in the copy step
+console.log('✓ Build uses ultimate UI with all features');
 
 console.log('\n🔥 Build complete! Ready for Cloudflare Pages deployment.');

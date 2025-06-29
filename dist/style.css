@@ -1865,5 +1865,3 @@ input[type="range"]::-moz-range-thumb {
         margin: 1rem;
     }
 }
-
-@import "style-final.css";
