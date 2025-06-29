@@ -1138,12 +1138,22 @@ input[type="range"]::-moz-range-thumb {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-family: var(--font-mono);
+    display: inline-block;
+    line-height: 1.2;
 }
 
 .btn-micro:hover {
     border-color: var(--matrix-green);
     color: var(--matrix-green);
     background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+    text-shadow: 0 0 5px var(--matrix-green-glow);
+}
+
+.btn-micro:active {
+    transform: scale(0.95);
+    background: var(--active-bg);
 }
 
 .control-section {

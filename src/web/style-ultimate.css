@@ -88,42 +88,132 @@
     border-radius: 2px;
 }
 
-.bin-item {
-    padding: 0.6rem;
-    background: var(--bg-tertiary);
+/* Nested File Structure Styles */
+.bin-folder {
+    margin-bottom: 0.4rem;
     border: 1px solid var(--border-color);
     border-radius: 3px;
-    margin-bottom: 0.4rem;
-    cursor: pointer;
+    background: var(--bg-tertiary);
     transition: all 0.2s ease;
-    font-size: 0.8rem;
 }
 
-.bin-item:hover {
-    background: var(--hover-bg);
-    border-color: var(--matrix-green-dim);
-    transform: translateX(2px);
-}
-
-.bin-item.active {
-    background: var(--active-bg);
+.bin-folder.active {
     border-color: var(--matrix-green);
     box-shadow: var(--glow-sm);
+}
+
+.bin-folder.expanded {
+    background: var(--bg-secondary);
+}
+
+.bin-header {
+    padding: 0.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.bin-header:hover {
+    background: var(--hover-bg);
+}
+
+.folder-icon {
+    color: var(--matrix-green-dim);
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.bin-folder.expanded .folder-icon {
+    transform: rotate(90deg);
 }
 
 .bin-name {
     color: var(--text-primary);
     font-weight: 500;
-    display: block;
+    flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.bin-meta {
+.bin-count {
     color: var(--text-secondary);
     font-size: 0.7rem;
-    margin-top: 0.2rem;
+    background: var(--bg-primary);
+    padding: 0.1rem 0.4rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+/* Nested conversation list */
+.conversation-list.nested {
+    padding: 0 0 0.5rem 1.5rem;
+    display: none;
+}
+
+.bin-folder.expanded .conversation-list.nested {
+    display: block;
+}
+
+.conversation-file {
+    padding: 0.4rem 0.6rem;
+    margin: 0.2rem 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.conversation-file:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green-dim);
+    transform: translateX(2px);
+}
+
+.file-icon {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-name {
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    display: flex;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    margin-top: 0.1rem;
+}
+
+.loading-state, .error-state, .empty-nested {
+    padding: 0.5rem 1rem;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.error-state {
+    color: #ff4444;
 }
 
 .bin-actions {
@@ -135,6 +225,31 @@
 
 .bin-actions button {
     flex: 1;
+}
+
+/* Ensure export button is properly styled */
+#exportBin {
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+}
+
+#exportBin:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+#deleteBin {
+    background: var(--bg-primary);
+    border: 1px solid #ff4444;
+    color: #ff4444;
+}
+
+#deleteBin:hover {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: #ff6666;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
 }
 
 /* No Bin Message */

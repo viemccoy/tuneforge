@@ -338,13 +338,106 @@ class TuneForgeUltimate {
         
         this.bins.forEach(bin => {
             const binEl = document.createElement('div');
-            binEl.className = 'bin-item' + (this.currentBin?.id === bin.id ? ' active' : '');
-            binEl.innerHTML = `
-                <div class="bin-name">${this.escapeHtml(bin.name)}</div>
-                <div class="bin-meta">${bin.conversationCount || 0} conversations</div>
+            binEl.className = 'bin-folder' + (this.currentBin?.id === bin.id ? ' active' : '');
+            
+            // Bin header (clickable to expand/collapse)
+            const binHeader = document.createElement('div');
+            binHeader.className = 'bin-header';
+            binHeader.innerHTML = `
+                <span class="folder-icon">▶</span>
+                <span class="bin-name">${this.escapeHtml(bin.name)}</span>
+                <span class="bin-count">${bin.conversationCount || 0}</span>
             `;
-            binEl.addEventListener('click', () => this.selectBin(bin));
+            binHeader.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleBinExpanded(bin.id);
+            });
+            
+            // Conversation list (nested)
+            const convList = document.createElement('div');
+            convList.className = 'conversation-list nested';
+            convList.id = `convList-${bin.id}`;
+            convList.style.display = 'none';
+            
+            binEl.appendChild(binHeader);
+            binEl.appendChild(convList);
             binList.appendChild(binEl);
+            
+            // Select bin when clicking header
+            binHeader.addEventListener('dblclick', () => this.selectBin(bin));
+        });
+    }
+    
+    async toggleBinExpanded(binId) {
+        const convList = document.getElementById(`convList-${binId}`);
+        const binEl = convList.parentElement;
+        const folderIcon = binEl.querySelector('.folder-icon');
+        
+        if (convList.style.display === 'none') {
+            // Expand - load conversations if needed
+            convList.style.display = 'block';
+            folderIcon.textContent = '▼';
+            binEl.classList.add('expanded');
+            
+            // Load conversations for this bin
+            await this.loadConversationsForBin(binId);
+        } else {
+            // Collapse
+            convList.style.display = 'none';
+            folderIcon.textContent = '▶';
+            binEl.classList.remove('expanded');
+        }
+    }
+    
+    async loadConversationsForBin(binId) {
+        const convList = document.getElementById(`convList-${binId}`);
+        convList.innerHTML = '<div class="loading-state">Loading conversations...</div>';
+        
+        let conversations = [];
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await fetch(`${this.apiBase}/conversations?binId=${binId}`);
+                const data = await response.json();
+                conversations = data.conversations || [];
+            } catch (error) {
+                console.error('Failed to load conversations:', error);
+                convList.innerHTML = '<div class="error-state">Failed to load</div>';
+                return;
+            }
+        } else {
+            // In Socket.io mode, filter conversations by bin
+            const allConvs = JSON.parse(localStorage.getItem('tuneforge_conversations') || '[]');
+            conversations = allConvs.filter(c => c.binId === binId);
+        }
+        
+        convList.innerHTML = '';
+        
+        if (conversations.length === 0) {
+            convList.innerHTML = '<div class="empty-nested">No conversations yet</div>';
+            return;
+        }
+        
+        conversations.forEach(conv => {
+            const convEl = document.createElement('div');
+            convEl.className = 'conversation-file';
+            
+            const preview = conv.messages.find(m => m.role === 'user')?.content || 'Empty conversation';
+            const date = new Date(conv.metadata.createdAt);
+            
+            convEl.innerHTML = `
+                <span class="file-icon">📄</span>
+                <div class="file-info">
+                    <div class="file-name">${this.escapeHtml(preview.substring(0, 30))}...</div>
+                    <div class="file-meta">
+                        <span>${date.toLocaleDateString()}</span>
+                        <span>${conv.metadata.turnCount} turns</span>
+                    </div>
+                </div>
+            `;
+            
+            convEl.addEventListener('click', () => this.loadConversation(conv));
+            convList.appendChild(convEl);
         });
     }
     
@@ -369,6 +462,14 @@ class TuneForgeUltimate {
         
         // Update bin list UI
         this.renderBinList();
+        
+        // Auto-expand selected bin
+        setTimeout(() => {
+            const convList = document.getElementById(`convList-${bin.id}`);
+            if (convList && convList.style.display === 'none') {
+                this.toggleBinExpanded(bin.id);
+            }
+        }, 100);
         
         // Start new conversation
         this.newConversation();
@@ -602,6 +703,32 @@ class TuneForgeUltimate {
     }
     
     // Conversation Management
+    loadConversation(conversation) {
+        // Load conversation into the UI
+        this.currentMessages = conversation.messages.filter(m => m.role !== 'system');
+        
+        // Clear and rebuild conversation flow
+        const flow = document.getElementById('conversationFlow');
+        flow.innerHTML = '';
+        
+        // Add all messages to UI
+        this.currentMessages.forEach(msg => {
+            this.addMessageToUI(msg);
+        });
+        
+        // Update stats
+        document.getElementById('turnCount').textContent = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('saveConversation').disabled = false;
+        
+        // Scroll to bottom
+        flow.scrollTop = flow.scrollHeight;
+        
+        // Focus input for continuation
+        document.getElementById('userMessage').focus();
+        
+        this.showNotification('Conversation loaded');
+    }
+    
     newConversation() {
         this.currentMessages = [];
         document.getElementById('conversationFlow').innerHTML = `
