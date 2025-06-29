@@ -1,12 +1,13 @@
 // AI generation endpoint
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
   
   try {
-    const { binId, systemPrompt, messages, models, temperature, maxTokens } = await request.json();
+    const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens } = await request.json();
     
     if (!binId || !messages || !models || models.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid request' }), {
@@ -24,19 +25,33 @@ export async function onRequestPost(context) {
       apiKey: env.ANTHROPIC_API_KEY
     }) : null;
     
+    const google = env.GOOGLE_API_KEY ? new GoogleGenerativeAI(env.GOOGLE_API_KEY) : null;
+    
     // Generate responses in parallel
     const responsePromises = models.map(async (modelId) => {
       try {
-        if (modelId.startsWith('gpt') && openai) {
-          const completion = await openai.chat.completions.create({
+        // Handle OpenAI models (including o3/o4-mini)
+        if ((modelId.startsWith('gpt') || modelId.startsWith('o3') || modelId.startsWith('o4')) && openai) {
+          const isO3Model = modelId.includes('o3') || modelId.includes('o4-mini');
+          
+          const params = {
             model: modelId,
             messages: [
               { role: 'system', content: systemPrompt },
               ...messages
-            ],
-            temperature: temperature || 0.7,
-            max_tokens: maxTokens || 1000
-          });
+            ]
+          };
+          
+          // Use appropriate parameters based on model type
+          if (isO3Model) {
+            params.max_completion_tokens = max_completion_tokens || maxTokens || 1000;
+            // o3 models don't support temperature
+          } else {
+            params.temperature = temperature || 0.7;
+            params.max_tokens = maxTokens || 1000;
+          }
+          
+          const completion = await openai.chat.completions.create(params);
           
           return {
             model: modelId,
@@ -62,6 +77,47 @@ export async function onRequestPost(context) {
               prompt_tokens: completion.usage.input_tokens,
               completion_tokens: completion.usage.output_tokens,
               total_tokens: completion.usage.input_tokens + completion.usage.output_tokens
+            }
+          };
+        } else if ((modelId.includes('gemini') || modelId.startsWith('models/gemini')) && google) {
+          // Handle Google Gemini models
+          const modelName = modelId.replace('models/', ''); // Remove 'models/' prefix if present
+          const model = google.getGenerativeModel({ model: modelName });
+          
+          // Combine system prompt with first user message for Gemini
+          const combinedMessages = [...messages];
+          if (systemPrompt && combinedMessages.length > 0 && combinedMessages[0].role === 'user') {
+            combinedMessages[0] = {
+              ...combinedMessages[0],
+              content: `${systemPrompt}\n\n${combinedMessages[0].content}`
+            };
+          }
+          
+          // Convert messages to Gemini format
+          const history = [];
+          let currentPrompt = '';
+          
+          combinedMessages.forEach((msg, index) => {
+            if (index === combinedMessages.length - 1 && msg.role === 'user') {
+              currentPrompt = msg.content;
+            } else {
+              history.push({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.content }]
+              });
+            }
+          });
+          
+          const chat = model.startChat({ history });
+          const result = await chat.sendMessage(currentPrompt);
+          const response = await result.response;
+          
+          return {
+            model: modelId,
+            content: response.text(),
+            usage: {
+              // Gemini doesn't provide token counts in the same way
+              total_tokens: Math.ceil((currentPrompt.length + response.text().length) / 4)
             }
           };
         } else {

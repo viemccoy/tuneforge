@@ -913,3 +913,120 @@
         opacity: 1;
     }
 }
+
+/* Enhanced Response Editor and Regenerate Menu Styles */
+.response-actions .action-btn {
+    width: 28px;
+    height: 28px;
+    background: #000000;
+    border: 1px solid var(--matrix-green-dim);
+    border-radius: 3px;
+    color: var(--matrix-green);
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.response-actions .action-btn:hover {
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+    transform: scale(1.1);
+}
+
+.editor-header,
+.regen-header {
+    background: rgba(0, 255, 65, 0.05);
+    border-bottom: 1px solid var(--matrix-green-dim);
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.editor-title,
+.regen-title {
+    color: var(--matrix-green-bright);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--matrix-green);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: var(--matrix-green-bright);
+    transform: rotate(90deg);
+}
+
+.token-input,
+.model-select,
+.instructions-textarea {
+    background: #000000;
+    border: 1px solid var(--matrix-green-dim);
+    color: var(--matrix-green);
+    padding: 0.6rem;
+    font-family: 'Courier New', monospace;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.token-input:focus,
+.model-select:focus,
+.instructions-textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+    background: rgba(0, 255, 65, 0.02);
+}
+
+.instructions-textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.select-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 255, 65, 0.1);
+    border: 2px solid var(--matrix-green);
+    border-radius: 4px;
+    color: var(--matrix-green-bright);
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.select-btn:hover {
+    background: var(--matrix-green);
+    color: #000000;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+    transform: scale(1.1);
+}
+
+.value-display {
+    color: var(--matrix-green-bright);
+    font-weight: 600;
+    font-size: 0.9rem;
+}

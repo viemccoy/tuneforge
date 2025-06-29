@@ -693,15 +693,14 @@ class TuneForgeUltimate {
     // Model Management
     async loadModels() {
         if (this.isCloudflare) {
-            // Static list for Cloudflare mode
+            // Static list for Cloudflare mode - matching local server models
             this.availableModels = [
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
-                { id: 'o3-2025-04-16', name: 'O3', provider: 'openai' },
-                { id: 'o4-mini-2025-04-16', name: 'O4 Mini', provider: 'openai' },
-                { id: 'claude-opus-4-20250514', name: 'Opus 4', provider: 'anthropic' },
-                { id: 'claude-sonnet-4-20250514', name: 'Sonnet 4', provider: 'anthropic' },
-                { id: 'gemini-2.5-pro', name: '2.5 Pro', provider: 'google' },
-                { id: 'models/gemini-2.5-flash', name: '2.5 Flash', provider: 'google' }
+                { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
+                { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
+                { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
+                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
+                { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.5 Flash', provider: 'google' }
             ];
         } else {
             // Request from server
@@ -1114,6 +1113,8 @@ class TuneForgeUltimate {
     
     createCompletionCard(response, index) {
         const isError = response.error || !response.content;
+        const escapedContent = !isError ? this.escapeHtml(response.content) : '';
+        
         return `
             <div class="completion-card ${index === 0 ? 'active' : ''} ${isError ? 'error' : ''}" data-index="${index}">
                 <div class="completion-meta">
@@ -1122,58 +1123,62 @@ class TuneForgeUltimate {
                         ${response.usage ? `${response.usage.total_tokens} tokens` : ''}
                     </div>
                 </div>
-                <div class="completion-content">
+                <div class="completion-content" id="content-${index}">
                     ${isError ? 
                         `<div class="error-message">${response.error || 'No response generated'}</div>` :
-                        this.escapeHtml(response.content)
+                        escapedContent
                     }
                 </div>
                 ${!isError ? `
                 <div class="response-actions">
-                    <button class="edit-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">✏️</button>
-                    <button class="regen-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">🔄</button>
+                    <button class="edit-btn action-btn" onclick="tuneforge.editResponse(${index})" title="Edit response">✏️</button>
+                    <button class="regen-btn action-btn" onclick="tuneforge.showRegenMenu(${index})" title="Regenerate response">🔄</button>
                 </div>
                 <div class="response-editor" id="editor-${index}">
-                    <textarea class="edit-textarea" id="edit-textarea-${index}">${response.content}</textarea>
+                    <div class="editor-header">
+                        <span class="editor-title">EDIT RESPONSE</span>
+                        <button class="close-btn" onclick="tuneforge.cancelEdit(${index})">×</button>
+                    </div>
+                    <textarea class="edit-textarea" id="edit-textarea-${index}">${escapedContent}</textarea>
                     <div class="edit-actions">
                         <button class="btn-compact btn-primary save-edit" onclick="tuneforge.saveEdit(${index})">SAVE</button>
                         <button class="btn-compact cancel-edit" onclick="tuneforge.cancelEdit(${index})">CANCEL</button>
                     </div>
                 </div>
                 <div class="regen-menu" id="regen-menu-${index}">
-                    <div class="regen-section">
-                        <h4>Regenerate Settings</h4>
-                        <div class="regen-controls">
-                            <div class="control-group">
-                                <label>Temperature</label>
-                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}">
-                                <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span>
-                            </div>
-                            <div class="control-group">
-                                <label>Max Tokens</label>
-                                <input type="number" id="regen-tokens-${index}" min="100" max="4000" value="${response.maxTokens || 1000}">
-                            </div>
-                            <div class="control-group">
-                                <label>Model</label>
-                                <select id="regen-model-${index}">
-                                    <option value="same">Same Model (${response.model})</option>
-                                    ${this.availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label>Custom Instructions</label>
-                                <textarea id="regen-instructions-${index}" placeholder="Add specific instructions for regeneration..."></textarea>
-                            </div>
+                    <div class="regen-header">
+                        <span class="regen-title">REGENERATE SETTINGS</span>
+                        <button class="close-btn" onclick="tuneforge.closeRegenMenu(${index})">×</button>
+                    </div>
+                    <div class="regen-controls">
+                        <div class="control-group">
+                            <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span></label>
+                            <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
                         </div>
-                        <div class="regen-actions">
-                            <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">REGENERATE</button>
-                            <button class="btn-compact" onclick="tuneforge.closeRegenMenu(${index})">CANCEL</button>
+                        <div class="control-group">
+                            <label>Max Tokens</label>
+                            <input type="number" id="regen-tokens-${index}" min="100" max="4000" value="${response.maxTokens || 1000}" class="token-input">
                         </div>
+                        <div class="control-group">
+                            <label>Model</label>
+                            <select id="regen-model-${index}" class="model-select">
+                                <option value="same">Same Model (${response.model})</option>
+                                ${this.availableModels.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Custom Instructions</label>
+                            <textarea id="regen-instructions-${index}" class="instructions-textarea" placeholder="Add specific instructions for regeneration..."></textarea>
+                        </div>
+                    </div>
+                    <div class="regen-actions">
+                        <button class="btn-compact btn-primary" onclick="tuneforge.regenerateSingle(${index})">REGENERATE</button>
+                        <button class="btn-compact cancel-btn" onclick="tuneforge.closeRegenMenu(${index})">CANCEL</button>
                     </div>
                 </div>
                 ` : ''}
                 <div class="completion-actions">
-                    <button class="action-btn" onclick="tuneforge.selectResponse(${index})" title="Select">✓</button>
+                    <button class="action-btn select-btn" onclick="tuneforge.selectResponse(${index})" title="Select">✓</button>
                 </div>
             </div>
         `;
@@ -1248,7 +1253,21 @@ class TuneForgeUltimate {
     }
     
     editResponse(index) {
-        document.getElementById(`editor-${index}`).classList.add('active');
+        // Close any other open editors or menus
+        document.querySelectorAll('.response-editor.active').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.regen-menu.active').forEach(el => el.classList.remove('active'));
+        
+        // Open this editor
+        const editor = document.getElementById(`editor-${index}`);
+        if (editor) {
+            editor.classList.add('active');
+            // Focus the textarea
+            const textarea = document.getElementById(`edit-textarea-${index}`);
+            if (textarea) {
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            }
+        }
     }
     
     saveEdit(index) {
@@ -1258,19 +1277,36 @@ class TuneForgeUltimate {
             this.activeLoom.responses[index].edited = true;
             
             // Update display
-            const card = document.querySelector(`.completion-card[data-index="${index}"] .completion-content`);
-            card.innerHTML = this.escapeHtml(newContent);
+            const contentEl = document.getElementById(`content-${index}`);
+            if (contentEl) {
+                contentEl.innerHTML = this.escapeHtml(newContent);
+            }
+            
+            // Update model label to show (edited)
+            const modelEl = document.querySelector(`.completion-card[data-index="${index}"] .completion-model`);
+            if (modelEl && !modelEl.textContent.includes('(edited)')) {
+                modelEl.textContent += ' (edited)';
+            }
             
             // Hide editor
             document.getElementById(`editor-${index}`).classList.remove('active');
+            
+            this.showNotification('Response edited successfully');
         }
     }
     
     cancelEdit(index) {
-        document.getElementById(`editor-${index}`).classList.remove('active');
-        // Reset textarea
+        const editor = document.getElementById(`editor-${index}`);
+        if (editor) {
+            editor.classList.remove('active');
+        }
+        
+        // Reset textarea to original content
         if (this.activeLoom && this.activeLoom.responses[index]) {
-            document.getElementById(`edit-textarea-${index}`).value = this.activeLoom.responses[index].content;
+            const textarea = document.getElementById(`edit-textarea-${index}`);
+            if (textarea) {
+                textarea.value = this.activeLoom.responses[index].content;
+            }
         }
     }
     
