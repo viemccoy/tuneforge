@@ -1,0 +1,409 @@
+/* Ultimate UI Enhancements - Merging Original + Bin Management */
+
+/* Layout adjustments for bin-aware interface */
+.main-content {
+    grid-template-columns: 350px 1fr 280px;
+}
+
+/* When no bin is selected, hide controls */
+.no-bin-selected .controls-panel,
+.no-bin-selected .input-area,
+.no-bin-selected .conversation-display {
+    display: none !important;
+}
+
+.no-bin-selected .conversation-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Collapsible Section Styles */
+.sidebar-section.collapsible {
+    margin-bottom: 1.5rem;
+}
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+    margin-bottom: 0.75rem;
+}
+
+.section-toggle:hover {
+    color: var(--matrix-green-bright);
+}
+
+.toggle-icon {
+    margin-right: 0.5rem;
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.sidebar-section.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.sidebar-section.collapsed .section-content {
+    display: none;
+}
+
+.section-content {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+    }
+}
+
+/* Bin List Styles */
+.bin-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--matrix-green-dim) var(--bg-tertiary);
+}
+
+.bin-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.bin-list::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+}
+
+.bin-list::-webkit-scrollbar-thumb {
+    background: var(--matrix-green-dim);
+    border-radius: 2px;
+}
+
+.bin-item {
+    padding: 0.6rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+}
+
+.bin-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green-dim);
+    transform: translateX(2px);
+}
+
+.bin-item.active {
+    background: var(--active-bg);
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+.bin-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bin-meta {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    margin-top: 0.2rem;
+}
+
+.bin-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.bin-actions button {
+    flex: 1;
+}
+
+/* No Bin Message */
+.no-bin-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+}
+
+.no-bin-message .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+
+.no-bin-message h3 {
+    color: var(--matrix-green);
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Header Bin Status */
+#currentBinName {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Compact button in section header */
+.section-toggle .btn-compact {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    min-height: 20px;
+}
+
+/* Modal Enhancements */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+    background: var(--bg-secondary);
+}
+
+/* Auth Modal Specific */
+.auth-modal {
+    text-align: center;
+    min-width: 400px;
+}
+
+.auth-form {
+    margin-top: 2rem;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: var(--border-active);
+    box-shadow: var(--glow-sm);
+}
+
+.error-message {
+    color: #ff4444;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    min-height: 1.2rem;
+}
+
+/* Conversations List in Modal */
+.conversations-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 0;
+}
+
+.conversation-item {
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.conversation-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--matrix-green-dim);
+}
+
+.conv-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.conv-date {
+    color: var(--text-secondary);
+}
+
+.conv-turns {
+    color: var(--matrix-green);
+}
+
+.conv-preview {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    max-height: 3rem;
+    overflow: hidden;
+}
+
+/* Ensure proper layout when bin is selected */
+.bin-selected .main-content {
+    grid-template-rows: 1fr 120px 40px;
+}
+
+/* Edit Response Functionality */
+.response-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.completion-card:hover .response-actions {
+    opacity: 1;
+}
+
+.edit-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.edit-btn:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.response-editor {
+    margin-top: 0.75rem;
+    display: none;
+}
+
+.response-editor.active {
+    display: block;
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 100px;
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.edit-textarea:focus {
+    outline: none;
+    box-shadow: var(--glow-sm);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
+}
+
+.save-edit, .cancel-edit {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+    .main-content {
+        grid-template-columns: 320px 1fr 260px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .main-content {
+        grid-template-columns: 300px 1fr 240px;
+    }
+    
+    .bin-list {
+        max-height: 150px;
+    }
+}
+
+@media (max-width: 1024px) {
+    /* Stack bins above config on smaller screens */
+    .sidebar-section.collapsible {
+        margin-bottom: 1rem;
+    }
+    
+    .bin-list {
+        max-height: 120px;
+    }
+}
