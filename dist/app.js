@@ -133,6 +133,9 @@ class TuneForgeUltimate {
         
         // Setup collapsible sections
         this.setupCollapsibles();
+        
+        // Initialize Loom
+        this.loom = new ConversationLoom(this);
     }
     
     initializeEventListeners() {
