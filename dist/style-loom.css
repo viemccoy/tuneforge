@@ -1,0 +1,452 @@
+/* Loom Interface Styles - Cyberpunk Matrix Theme */
+
+/* Loom Modal */
+.loom-modal .modal-content {
+    max-width: 90vw;
+    width: 1200px;
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.loom-content {
+    background: var(--bg-primary);
+    border: 2px solid var(--matrix-green);
+    box-shadow: 
+        0 0 30px rgba(0, 255, 65, 0.3),
+        inset 0 0 20px rgba(0, 255, 65, 0.1);
+}
+
+.loom-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--matrix-green-dim);
+}
+
+.loom-title h2 {
+    color: var(--matrix-green);
+    font-size: 1.5rem;
+    margin: 0;
+    text-shadow: var(--glow-md);
+    letter-spacing: 0.15em;
+}
+
+.loom-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    letter-spacing: 0.1em;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.loom-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Loom Controls */
+.loom-controls {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.loom-actions,
+.loom-view-controls {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.loom-btn {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.05em;
+}
+
+.loom-btn:hover {
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.loom-btn.active {
+    background: var(--active-bg);
+    border-color: var(--matrix-green);
+    color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+/* Loom Visualization */
+.loom-visualization {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.loom-canvas {
+    flex: 1;
+    background: var(--bg-primary);
+    position: relative;
+    overflow: auto;
+    border-right: 1px solid var(--border-color);
+}
+
+/* Canvas Grid Background */
+.loom-canvas::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(var(--border-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+    background-size: 50px 50px;
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+/* Loom Sidebar */
+.loom-sidebar {
+    width: 300px;
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.branch-info h3,
+.branch-list h3 {
+    color: var(--matrix-green);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    text-shadow: var(--glow-sm);
+}
+
+.branch-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+}
+
+.detail-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.detail-value {
+    color: var(--matrix-green);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Thread List */
+.thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.thread-item {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.thread-item:hover {
+    border-color: var(--matrix-green-dim);
+    background: var(--hover-bg);
+}
+
+.thread-item.active {
+    border-color: var(--matrix-green);
+    background: var(--active-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.thread-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.thread-meta {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    display: flex;
+    gap: 1rem;
+}
+
+/* Loom Status Bar */
+.loom-status {
+    display: flex;
+    gap: 2rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-item span {
+    color: var(--matrix-green);
+    font-weight: 600;
+}
+
+/* Tree View Nodes */
+.loom-node {
+    position: absolute;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 150px;
+}
+
+.loom-node:hover {
+    border-color: var(--matrix-green-dim);
+    background: var(--hover-bg);
+    box-shadow: var(--glow-sm);
+}
+
+.loom-node.active {
+    border-color: var(--matrix-green);
+    background: var(--active-bg);
+    box-shadow: var(--glow-md);
+}
+
+.loom-node.branch {
+    border-style: dashed;
+    border-color: var(--matrix-green-dim);
+}
+
+.node-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.node-type {
+    color: var(--matrix-green);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.node-id {
+    color: var(--text-secondary);
+    font-size: 0.625rem;
+    font-family: var(--font-mono);
+}
+
+.node-content {
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    max-height: 60px;
+    overflow: hidden;
+    position: relative;
+}
+
+.node-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(transparent, var(--bg-secondary));
+}
+
+/* Connections */
+.loom-connection {
+    position: absolute;
+    pointer-events: none;
+}
+
+.loom-connection svg {
+    overflow: visible;
+}
+
+.loom-connection path {
+    fill: none;
+    stroke: var(--matrix-green-dim);
+    stroke-width: 2;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.loom-connection.active path {
+    stroke: var(--matrix-green);
+    stroke-width: 3;
+    opacity: 1;
+    filter: drop-shadow(0 0 5px var(--matrix-green-glow));
+}
+
+/* Timeline View */
+.timeline-container {
+    padding: 2rem;
+    overflow-x: auto;
+}
+
+.timeline-track {
+    display: flex;
+    align-items: center;
+    position: relative;
+    min-height: 100px;
+    margin-bottom: 2rem;
+}
+
+.timeline-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--matrix-green-dim);
+    opacity: 0.3;
+}
+
+.timeline-node {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--matrix-green);
+    cursor: pointer;
+    z-index: 1;
+    margin: 0 2rem;
+    transition: all 0.2s ease;
+}
+
+.timeline-node:hover {
+    transform: scale(1.2);
+    box-shadow: var(--glow-md);
+}
+
+.timeline-node.branch-point {
+    width: 30px;
+    height: 30px;
+    border-color: var(--matrix-green-bright);
+    background: var(--active-bg);
+}
+
+/* Graph View */
+.graph-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+/* Loading Animation */
+.loom-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.loom-loading-text {
+    color: var(--matrix-green);
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    text-shadow: var(--glow-lg);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.loom-loading-bar {
+    width: 200px;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.loom-loading-progress {
+    height: 100%;
+    background: var(--matrix-green);
+    box-shadow: var(--glow-md);
+    animation: loading-scan 2s ease-in-out infinite;
+}
+
+@keyframes loading-scan {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .loom-modal .modal-content {
+        width: 95vw;
+        height: 90vh;
+    }
+    
+    .loom-sidebar {
+        width: 250px;
+    }
+}
+
+@media (max-width: 768px) {
+    .loom-controls {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .loom-visualization {
+        flex-direction: column;
+    }
+    
+    .loom-sidebar {
+        width: 100%;
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+    }
+}
