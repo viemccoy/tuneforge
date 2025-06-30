@@ -48,6 +48,56 @@ class ConversationLoom {
         });
     }
     
+    // Add loom icons to messages
+    addLoomIcons() {
+        // Add to regular messages
+        document.querySelectorAll('.message').forEach((messageEl, index) => {
+            if (!messageEl.querySelector('.message-loom-icon')) {
+                const loomIcon = document.createElement('button');
+                loomIcon.className = 'message-loom-icon';
+                loomIcon.innerHTML = '◈';
+                loomIcon.title = 'Open loom at this point';
+                loomIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.openAtMessage(index);
+                });
+                messageEl.appendChild(loomIcon);
+            }
+        });
+        
+        // Add to completion cards
+        document.querySelectorAll('.completion-card').forEach((cardEl, index) => {
+            const actionsEl = cardEl.querySelector('.completion-actions');
+            if (actionsEl && !actionsEl.querySelector('.loom-btn')) {
+                const loomBtn = document.createElement('button');
+                loomBtn.className = 'action-btn loom-btn';
+                loomBtn.innerHTML = '◈';
+                loomBtn.title = 'Open loom for this completion';
+                loomBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.openAtCompletion(index);
+                });
+                actionsEl.appendChild(loomBtn);
+            }
+        });
+    }
+    
+    async openAtMessage(messageIndex) {
+        this.targetMessageIndex = messageIndex;
+        await this.open();
+        
+        // Highlight the specific message point in the loom
+        this.app.showNotification(`Loom opened at message ${messageIndex + 1}`, 'info');
+    }
+    
+    async openAtCompletion(completionIndex) {
+        this.targetCompletionIndex = completionIndex;
+        await this.open();
+        
+        // Focus on the current position
+        this.app.showNotification(`Loom opened for completion variant`, 'info');
+    }
+    
     async open() {
         this.modal.classList.add('active');
         this.updateStatus('LOADING');

@@ -17,10 +17,12 @@ if (!fs.existsSync(distDir)) {
 const staticFiles = [
   'src/web/index-ultimate.html',
   'src/web/app-ultimate.js',
+  'src/web/loom.js',
   'src/web/style.css',
   'src/web/style-bins.css',
   'src/web/style-final.css',
-  'src/web/style-ultimate.css'
+  'src/web/style-ultimate.css',
+  'src/web/style-loom.css'
 ];
 
 staticFiles.forEach(file => {

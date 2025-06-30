@@ -705,6 +705,7 @@ input[type="range"]::-moz-range-thumb {
     background: var(--bg-secondary);
     animation: messageSlideIn 0.3s ease-out;
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .message:hover {
@@ -750,6 +751,37 @@ input[type="range"]::-moz-range-thumb {
     line-height: 1.6;
     white-space: pre-wrap;
     color: var(--text-primary);
+}
+
+/* Loom icon for messages */
+.message-loom-icon {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 28px;
+    height: 28px;
+    background: var(--bg-primary);
+    border: 1px solid var(--matrix-green-dim);
+    border-radius: 3px;
+    color: var(--matrix-green);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.message:hover .message-loom-icon {
+    display: flex;
+}
+
+.message-loom-icon:hover {
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+    transform: scale(1.1);
 }
 
 /* Completion Loom */

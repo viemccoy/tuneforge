@@ -1147,6 +1147,11 @@ class TuneForgeUltimate {
         
         flow.appendChild(messageEl);
         flow.scrollTop = flow.scrollHeight;
+        
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            this.loom.addLoomIcons();
+        }
     }
     
     showLoomLoading() {
@@ -1218,6 +1223,11 @@ class TuneForgeUltimate {
         const loomElement = loomEl.querySelector('.completion-loom');
         if (loomElement) {
             setTimeout(() => loomElement.focus(), 100);
+        }
+        
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            setTimeout(() => this.loom.addLoomIcons(), 100);
         }
         
         // Enable save button
@@ -1396,6 +1406,11 @@ class TuneForgeUltimate {
         
         this.activeLoom.element.replaceWith(messageEl);
         this.activeLoom = null;
+        
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            setTimeout(() => this.loom.addLoomIcons(), 100);
+        }
         
         // Auto-save the conversation after selecting a response
         this.saveConversation(true);
