@@ -820,6 +820,58 @@
     50% { opacity: 0.7; }
 }
 
+/* Generating state styles */
+.btn-send.generating {
+    background: var(--matrix-green-dim) !important;
+    color: #000000 !important;
+    cursor: not-allowed !important;
+    animation: generating-pulse 1.5s infinite;
+}
+
+@keyframes generating-pulse {
+    0%, 100% { 
+        opacity: 1;
+        box-shadow: 0 0 5px var(--matrix-green-glow);
+    }
+    50% { 
+        opacity: 0.7;
+        box-shadow: 0 0 20px var(--matrix-green-glow);
+    }
+}
+
+input:disabled, textarea:disabled, button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Presence indicator styles */
+#presenceIndicator {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 255, 65, 0.1);
+    border: 1px solid var(--matrix-green-dim);
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: var(--matrix-green);
+    margin-bottom: 0.5rem;
+}
+
+.presence-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--matrix-green);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--matrix-green-glow);
+    animation: presence-pulse 2s infinite;
+}
+
+@keyframes presence-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
 /* Adjust action button spacing to prevent overlap */
 .action-btn {
     margin-left: 0.25rem;

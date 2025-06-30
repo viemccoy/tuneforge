@@ -1721,6 +1721,11 @@ input[type="range"]::-moz-range-thumb {
     background: rgba(255, 149, 0, 0.1);
 }
 
+.notification.info {
+    border-color: var(--matrix-green-dim);
+    background: rgba(0, 255, 65, 0.05);
+}
+
 .notification-icon {
     font-size: 1.25rem;
 }

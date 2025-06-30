@@ -25,6 +25,14 @@ class TuneForgeUltimate {
             modelUsage: {}
         };
         
+        // Request management
+        this.isGenerating = false;
+        this.activeRequestId = null;
+        
+        // Presence tracking
+        this.connectedUsers = new Map();
+        this.userId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
         // Cloudflare or Socket.io mode
         this.isCloudflare = window.location.hostname.includes('pages.dev') || 
                           window.location.hostname.includes('cloudflare') ||
@@ -226,7 +234,9 @@ class TuneForgeUltimate {
         document.getElementById('userMessage').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                this.sendMessage();
+                if (!this.isGenerating) {
+                    this.sendMessage();
+                }
             }
         });
     }
@@ -325,6 +335,10 @@ class TuneForgeUltimate {
         
         this.socket.on('responses', (data) => {
             this.handleResponses(data);
+            // Reset generation state for Socket.io
+            this.isGenerating = false;
+            this.activeRequestId = null;
+            this.enableGenerationUI();
         });
         
         this.socket.on('saved-prompts', (prompts) => {
@@ -335,6 +349,19 @@ class TuneForgeUltimate {
         this.socket.on('error', (error) => {
             console.error('Socket error:', error);
             this.showNotification(error.message || 'An error occurred', 'error');
+        });
+        
+        // Presence tracking
+        this.socket.on('user-joined', (data) => {
+            this.handleUserJoined(data);
+        });
+        
+        this.socket.on('user-left', (data) => {
+            this.handleUserLeft(data);
+        });
+        
+        this.socket.on('active-users', (users) => {
+            this.updateActiveUsers(users);
         });
     }
     
@@ -996,6 +1023,12 @@ class TuneForgeUltimate {
     }
     
     async sendMessage() {
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
+        
         if (!this.currentBin) {
             alert('Please select a bin first');
             return;
@@ -1008,6 +1041,11 @@ class TuneForgeUltimate {
             alert('Please select at least one model');
             return;
         }
+        
+        // Set generating flag and disable UI
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        this.disableGenerationUI();
         
         // Add user message
         this.currentMessages.push({ role: 'user', content: message });
@@ -1048,6 +1086,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             // Cloudflare API call
+            const currentRequestId = this.activeRequestId;
             try {
                 const response = await fetch(`${this.apiBase}/generate`, {
                     method: 'POST',
@@ -1055,11 +1094,28 @@ class TuneForgeUltimate {
                     body: JSON.stringify(generateParams)
                 });
                 
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
+                
                 const data = await response.json();
                 this.handleResponses({ responses: data.responses });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
                 this.showNotification('Failed to generate responses', 'error');
+                // Remove loading state
+                const flow = document.getElementById('conversationFlow');
+                const loadingEl = flow.querySelector('.loading-loom');
+                if (loadingEl) loadingEl.remove();
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    this.enableGenerationUI();
+                }
             }
         } else {
             // Socket.io emit
@@ -1107,6 +1163,11 @@ class TuneForgeUltimate {
     }
     
     handleResponses(data) {
+        // Reset generation state
+        this.isGenerating = false;
+        this.activeRequestId = null;
+        this.enableGenerationUI();
+        
         const flow = document.getElementById('conversationFlow');
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
@@ -1448,6 +1509,12 @@ class TuneForgeUltimate {
     async regenerateSingle(index) {
         if (!this.activeLoom || !this.activeLoom.responses[index]) return;
         
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
+        
         const response = this.activeLoom.responses[index];
         const temperature = parseFloat(document.getElementById(`regen-temp-${index}`).value);
         const maxTokens = parseInt(document.getElementById(`regen-tokens-${index}`).value);
@@ -1459,10 +1526,16 @@ class TuneForgeUltimate {
         // Close the menu
         this.closeRegenMenu(index);
         
+        // Set generating flag
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        
         // Show loading state on this card
         const card = document.querySelector(`.completion-card[data-index="${index}"]`);
         if (!card) {
             console.error('Card not found for index:', index);
+            this.isGenerating = false;
+            this.activeRequestId = null;
             return;
         }
         card.classList.add('regenerating');
@@ -1478,6 +1551,7 @@ class TuneForgeUltimate {
         }
         
         if (this.isCloudflare) {
+            const currentRequestId = this.activeRequestId;
             try {
                 // Prepare model-specific parameters
                 const generateParams = {
@@ -1505,6 +1579,12 @@ class TuneForgeUltimate {
                     body: JSON.stringify(generateParams)
                 });
                 
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
+                
                 const data = await response.json();
                 if (data.responses && data.responses[0]) {
                     // Update the response in place
@@ -1523,6 +1603,13 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Regeneration failed:', error);
                 this.showNotification('Failed to regenerate response', 'error');
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    card.classList.remove('regenerating');
+                }
             }
         } else {
             // Socket.io mode
@@ -1537,9 +1624,15 @@ class TuneForgeUltimate {
                 maxTokens,
                 isSingleRegeneration: true
             });
+            
+            // For Socket.io, we'll reset the state when we receive the response
+            // But still remove the regenerating class
+            setTimeout(() => {
+                card.classList.remove('regenerating');
+                this.isGenerating = false;
+                this.activeRequestId = null;
+            }, 100);
         }
-        
-        card.classList.remove('regenerating');
     }
     
     updateCompletionCard(index) {
@@ -1797,12 +1890,23 @@ class TuneForgeUltimate {
     
     // Regeneration
     async regenerateAll() {
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
+        
         // Find the last assistant message
         const lastAssistantIndex = this.currentMessages.findLastIndex(m => m.role === 'assistant');
         if (lastAssistantIndex === -1) {
             this.showNotification('No assistant message to regenerate', 'error');
             return;
         }
+        
+        // Set generating flag
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        this.disableGenerationUI();
         
         // Get messages up to (but not including) the last assistant message
         const messagesToSend = this.currentMessages.slice(0, lastAssistantIndex);
@@ -1844,6 +1948,7 @@ class TuneForgeUltimate {
         
         // Regenerate with all selected models
         if (this.isCloudflare) {
+            const currentRequestId = this.activeRequestId;
             try {
                 const generateParams = {
                     binId: this.currentBin.id,
@@ -1870,6 +1975,12 @@ class TuneForgeUltimate {
                     body: JSON.stringify(generateParams)
                 });
                 
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
+                
                 const data = await response.json();
                 this.handleResponses({ responses: data.responses });
                 
@@ -1879,6 +1990,13 @@ class TuneForgeUltimate {
                 // Remove loading loom
                 const loadingLoom = flow.querySelector('.loading-loom');
                 if (loadingLoom) loadingLoom.remove();
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    this.enableGenerationUI();
+                }
             }
         } else {
             // Socket.io mode
@@ -2209,6 +2327,86 @@ class TuneForgeUltimate {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    disableGenerationUI() {
+        // Disable all input controls during generation
+        document.getElementById('userMessage').disabled = true;
+        document.getElementById('sendMessage').disabled = true;
+        document.getElementById('regenerateLast').disabled = true;
+        
+        // Add visual feedback
+        document.getElementById('sendMessage').textContent = 'GENERATING...';
+        document.getElementById('sendMessage').classList.add('generating');
+        
+        // Disable model selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            el.style.pointerEvents = 'none';
+            el.style.opacity = '0.5';
+        });
+    }
+    
+    enableGenerationUI() {
+        // Re-enable all input controls
+        document.getElementById('userMessage').disabled = false;
+        document.getElementById('sendMessage').disabled = false;
+        document.getElementById('regenerateLast').disabled = false;
+        
+        // Reset visual feedback
+        document.getElementById('sendMessage').textContent = 'SEND';
+        document.getElementById('sendMessage').classList.remove('generating');
+        
+        // Re-enable model selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            el.style.pointerEvents = '';
+            el.style.opacity = '';
+        });
+        
+        // Focus back on input
+        document.getElementById('userMessage').focus();
+    }
+    
+    // Presence tracking methods
+    handleUserJoined(data) {
+        if (data.conversationId === this.currentConversationId && data.userId !== this.userId) {
+            this.connectedUsers.set(data.userId, data);
+            this.updatePresenceUI();
+            this.showNotification(`${data.userName || 'Another user'} joined the conversation`, 'info');
+        }
+    }
+    
+    handleUserLeft(data) {
+        if (data.userId !== this.userId) {
+            this.connectedUsers.delete(data.userId);
+            this.updatePresenceUI();
+            this.showNotification(`${data.userName || 'A user'} left the conversation`, 'info');
+        }
+    }
+    
+    updateActiveUsers(users) {
+        this.connectedUsers.clear();
+        users.forEach(user => {
+            if (user.userId !== this.userId && user.conversationId === this.currentConversationId) {
+                this.connectedUsers.set(user.userId, user);
+            }
+        });
+        this.updatePresenceUI();
+    }
+    
+    updatePresenceUI() {
+        const presenceEl = document.getElementById('presenceIndicator');
+        if (!presenceEl) return;
+        
+        const userCount = this.connectedUsers.size;
+        if (userCount > 0) {
+            presenceEl.style.display = 'flex';
+            presenceEl.innerHTML = `
+                <span class="presence-dot"></span>
+                <span class="presence-text">${userCount} other user${userCount > 1 ? 's' : ''} connected</span>
+            `;
+        } else {
+            presenceEl.style.display = 'none';
+        }
     }
     
     loadDataset() {
