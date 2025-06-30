@@ -6,6 +6,7 @@
     <title>🔥 TuneForge - Dataset Builder</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="style-ultimate.css">
+    <link rel="stylesheet" href="style-loom.css">
 </head>
 <body>
     <div class="app-container">
@@ -116,6 +117,7 @@
                             <button id="saveConversation" class="btn-success" disabled>SAVE</button>
                             <button id="deleteConversation" class="btn-danger btn-ghost" disabled>DELETE CONVO</button>
                             <button id="viewConversations" class="btn-ghost">VIEW ALL</button>
+                            <button id="openLoom" class="btn-ghost">◈ LOOM</button>
                         </div>
                     </div>
                     
@@ -476,7 +478,69 @@
             </div>
         </div>
     </div>
+    
+    <!-- Loom Modal -->
+    <div id="loomModal" class="modal loom-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content loom-content">
+            <div class="loom-header">
+                <div class="loom-title">
+                    <h2>>> CONVERSATION LOOM</h2>
+                    <span class="loom-subtitle">MULTIVERSE NAVIGATOR</span>
+                </div>
+                <button class="modal-close">[X]</button>
+            </div>
+            <div class="loom-body">
+                <div class="loom-controls">
+                    <div class="loom-actions">
+                        <button class="loom-btn" id="loomReset" title="Reset to origin">⟳ RESET</button>
+                        <button class="loom-btn" id="loomUndo" title="Undo last action">⟲ UNDO</button>
+                        <button class="loom-btn" id="loomBranch" title="Create branch">⟱ BRANCH</button>
+                        <button class="loom-btn" id="loomMerge" title="Merge branch">⟰ MERGE</button>
+                        <button class="loom-btn" id="loomFilter" title="Filter paths">≋ FILTER</button>
+                    </div>
+                    <div class="loom-view-controls">
+                        <button class="loom-btn active" id="viewTree" title="Tree view">[T] TREE</button>
+                        <button class="loom-btn" id="viewGraph" title="Graph view">[G] GRAPH</button>
+                        <button class="loom-btn" id="viewTimeline" title="Timeline view">═══▶ TIMELINE</button>
+                    </div>
+                </div>
+                <div class="loom-visualization" id="loomVisualization">
+                    <div class="loom-canvas" id="loomCanvas"></div>
+                    <div class="loom-sidebar">
+                        <div class="branch-info">
+                            <h3>CURRENT BRANCH</h3>
+                            <div class="branch-details" id="branchDetails">
+                                <div class="detail-row">
+                                    <span class="detail-label">TIMELINE:</span>
+                                    <span class="detail-value" id="currentTimeline">MAIN</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">DEPTH:</span>
+                                    <span class="detail-value" id="branchDepth">0</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">BRANCHES:</span>
+                                    <span class="detail-value" id="branchCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="branch-list">
+                            <h3>ACTIVE THREADS</h3>
+                            <div class="thread-list" id="threadList"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="loom-status">
+                    <span class="status-item">[<span id="loomStatus">READY</span>]</span>
+                    <span class="status-item">[NODES: <span id="nodeCount">0</span>]</span>
+                    <span class="status-item">[SELECTED: <span id="selectedNode">NONE</span>]</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <script src="loom.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
