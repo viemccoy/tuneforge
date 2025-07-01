@@ -7,7 +7,7 @@ Dataset builder for AI fine-tuning. Build high-quality training datasets through
 
 ## Features
 
-- **Multi-Model Support**: OpenAI and Anthropic models
+- **Multi-Model Support**: OpenAI, Anthropic, Gemini, and OpenRouter compatible models
 - **Conversation Management**: Build multi-turn dialogues
 - **Dataset Export**: JSONL format for fine-tuning
 - **Branching Conversations**: Create conversation branches with the Loom navigator
