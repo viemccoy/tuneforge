@@ -1152,6 +1152,22 @@ class TuneForgeUltimate {
             return;
         }
         
+        // Check if there's an active loom (unselected responses)
+        if (this.activeLoom) {
+            this.showNotification('Please select a response before sending a new message', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Pulse the loom to draw attention
+                loomElement.style.animation = 'none';
+                setTimeout(() => {
+                    loomElement.style.animation = 'loomPulse 0.5s ease-out';
+                }, 10);
+            }
+            return;
+        }
+        
         if (!this.currentBin) {
             alert('Please select a bin first');
             return;
@@ -1240,8 +1256,23 @@ class TuneForgeUltimate {
                     return;
                 }
                 
-                const data = await response.json();
-                this.handleResponses({ responses: data.responses });
+                // Check response status first
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+                
+                // Try to parse JSON with error handling
+                let data;
+                const responseText = await response.text();
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('Failed to parse API response:', responseText);
+                    throw new Error('Invalid response format from API');
+                }
+                
+                this.handleResponses({ responses: data.responses || [] });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
                 this.showNotification('Failed to generate responses - your message has been saved', 'error');
