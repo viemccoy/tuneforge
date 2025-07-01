@@ -123,8 +123,8 @@ class ConversationLoom {
             throw new Error('No active conversation');
         }
         
-        // Load branches from API
-        const response = await fetch(`${this.app.apiBase}/branches?conversationId=${this.app.currentConversationId}&binId=${this.app.currentBin.id}`);
+        // Load branches from API - use the app's authenticated fetch method
+        const response = await this.app.fetchWithAuth(`${this.app.apiBase}/branches?conversationId=${this.app.currentConversationId}&binId=${this.app.currentBin.id}`);
         if (!response.ok) throw new Error('Failed to load branches');
         
         const data = await response.json();
@@ -456,9 +456,8 @@ class ConversationLoom {
             // Create the branch with messages up to the branch point
             const branchMessages = node.messages.slice(0, actualBranchPoint);
             
-            const response = await fetch(`${this.app.apiBase}/branches`, {
+            const response = await this.app.fetchWithAuth(`${this.app.apiBase}/branches`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     binId: this.app.currentBin.id,
                     conversationId: this.app.currentConversationId,
@@ -498,9 +497,8 @@ class ConversationLoom {
         }
         
         try {
-            const response = await fetch(`${this.app.apiBase}/branches`, {
+            const response = await this.app.fetchWithAuth(`${this.app.apiBase}/branches`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     binId: this.app.currentBin.id,
                     conversationId: this.app.currentConversationId,

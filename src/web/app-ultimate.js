@@ -47,7 +47,7 @@ class TuneForgeUltimate {
         if (this.isCloudflare) {
             // Check if already authenticated
             try {
-                const response = await fetch(`${this.apiBase}/bins`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins`);
                 if (response.ok) {
                     this.authenticated = true;
                     this.hideAuthModal();
@@ -72,14 +72,26 @@ class TuneForgeUltimate {
         });
     }
     
+    // Helper method for authenticated fetch requests
+    async fetchWithAuth(url, options = {}) {
+        const defaultOptions = {
+            credentials: 'include', // Always include cookies
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        };
+        
+        return fetch(url, { ...defaultOptions, ...options });
+    }
+    
     async authenticate() {
         const password = document.getElementById('authPassword').value;
         const errorEl = document.getElementById('authError');
         
         try {
-            const response = await fetch(`${this.apiBase}/auth`, {
+            const response = await this.fetchWithAuth(`${this.apiBase}/auth`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password })
             });
             
@@ -136,6 +148,9 @@ class TuneForgeUltimate {
         
         // Initialize Loom
         this.loom = new ConversationLoom(this);
+        
+        // Check for any pending messages that may have been lost
+        this.checkPendingMessage();
     }
     
     initializeEventListeners() {
@@ -372,7 +387,7 @@ class TuneForgeUltimate {
     async loadBins() {
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins`);
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
@@ -456,13 +471,18 @@ class TuneForgeUltimate {
     
     async loadConversationsForBin(binId) {
         const convList = document.getElementById(`convList-${binId}`);
+        if (!convList) {
+            console.error(`Conversation list not found for bin ${binId}`);
+            return;
+        }
+        
         convList.innerHTML = '<div class="loading-state">Loading conversations...</div>';
         
         let conversations = [];
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations?binId=${binId}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${binId}`);
                 const data = await response.json();
                 conversations = data.conversations || [];
             } catch (error) {
@@ -475,6 +495,9 @@ class TuneForgeUltimate {
             const allConvs = JSON.parse(localStorage.getItem('tuneforge_conversations') || '[]');
             conversations = allConvs.filter(c => c.binId === binId);
         }
+        
+        // Sort conversations by creation date (newest first)
+        conversations.sort((a, b) => new Date(b.metadata.createdAt) - new Date(a.metadata.createdAt));
         
         convList.innerHTML = '';
         
@@ -514,6 +537,14 @@ class TuneForgeUltimate {
                 this.loadConversation(conv);
             });
             convList.appendChild(convEl);
+            
+            // Highlight if this is the current conversation
+            if (conv.id === this.currentConversationId) {
+                convEl.classList.add('current');
+                // Flash animation for new conversations
+                convEl.classList.add('new-conversation');
+                setTimeout(() => convEl.classList.remove('new-conversation'), 1000);
+            }
         });
     }
     
@@ -558,7 +589,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations?binId=${this.currentBin.id}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${this.currentBin.id}`);
                 const data = await response.json();
                 this.conversations = data.conversations || [];
                 this.updateStats();
@@ -599,9 +630,8 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bin)
                 });
                 
@@ -648,7 +678,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins/${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins/${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -1045,10 +1075,28 @@ class TuneForgeUltimate {
             return;
         }
         
+        // Save message to temporary storage in case of failure
+        const messageBackup = {
+            content: message,
+            timestamp: Date.now(),
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId
+        };
+        sessionStorage.setItem('tuneforge_pending_message', JSON.stringify(messageBackup));
+        
         // Set generating flag and disable UI
         this.isGenerating = true;
         this.activeRequestId = Date.now().toString();
         this.disableGenerationUI();
+        
+        // Log message state for debugging
+        console.log('[TuneForge] Sending message:', {
+            messageIndex: this.currentMessages.length,
+            content: message.substring(0, 50) + '...',
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId,
+            timestamp: new Date().toISOString()
+        });
         
         // Add user message
         this.currentMessages.push({ role: 'user', content: message });
@@ -1091,9 +1139,8 @@ class TuneForgeUltimate {
             // Cloudflare API call
             const currentRequestId = this.activeRequestId;
             try {
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
@@ -1107,11 +1154,28 @@ class TuneForgeUltimate {
                 this.handleResponses({ responses: data.responses });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
-                this.showNotification('Failed to generate responses', 'error');
+                this.showNotification('Failed to generate responses - your message has been saved', 'error');
+                
+                // Log error details for debugging
+                console.error('[TuneForge] Response generation failed:', {
+                    error: error.message,
+                    messageCount: this.currentMessages.length,
+                    timestamp: new Date().toISOString()
+                });
+                
                 // Remove loading state
                 const flow = document.getElementById('conversationFlow');
                 const loadingEl = flow.querySelector('.loading-loom');
                 if (loadingEl) loadingEl.remove();
+                
+                // Add error indicator to the last message
+                const lastMessageBlock = flow.lastElementChild;
+                if (lastMessageBlock && !lastMessageBlock.querySelector('.message-error')) {
+                    const errorIndicator = document.createElement('div');
+                    errorIndicator.className = 'message-error';
+                    errorIndicator.innerHTML = '⚠ Failed to generate response - message saved';
+                    lastMessageBlock.appendChild(errorIndicator);
+                }
             } finally {
                 // Only reset if this is still the active request
                 if (this.activeRequestId === currentRequestId) {
@@ -1176,14 +1240,33 @@ class TuneForgeUltimate {
         this.activeRequestId = null;
         this.enableGenerationUI();
         
+        // Log response handling for debugging
+        console.log('[TuneForge] Handling responses:', {
+            responseCount: data.responses?.length || 0,
+            messageCount: this.currentMessages.length,
+            timestamp: new Date().toISOString()
+        });
+        
         const flow = document.getElementById('conversationFlow');
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
         if (!data.responses || data.responses.length === 0) {
-            this.showNotification('No responses generated', 'error');
+            this.showNotification('No responses generated - your message has been saved', 'error');
+            
+            // Add recovery option
+            const recoveryEl = document.createElement('div');
+            recoveryEl.className = 'message-recovery';
+            recoveryEl.innerHTML = `
+                <button class="btn-recovery" onclick="app.retryLastMessage()">↻ Retry</button>
+                <button class="btn-recovery" onclick="app.removeLastMessage()">✕ Remove</button>
+            `;
+            flow.appendChild(recoveryEl);
             return;
         }
+        
+        // Clear pending message backup on successful response
+        sessionStorage.removeItem('tuneforge_pending_message');
         
         // Create loom
         const loomEl = document.createElement('div');
@@ -1235,6 +1318,12 @@ class TuneForgeUltimate {
         
         // Enable save button
         document.getElementById('saveConversation').disabled = false;
+        
+        // Auto-save conversation state periodically
+        if (this.currentMessages.length > 0 && this.currentMessages.length % 4 === 0) {
+            console.log('[TuneForge] Auto-saving conversation state');
+            this.saveConversation(true);
+        }
     }
     
     createCompletionCard(response, index) {
@@ -1591,9 +1680,8 @@ class TuneForgeUltimate {
                     generateParams.maxTokens = maxTokens;
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
@@ -1703,9 +1791,8 @@ class TuneForgeUltimate {
                     ? `${this.apiBase}/conversations`
                     : `${this.apiBase}/conversations/${conversationId}`;
                     
-                const response = await fetch(endpoint, {
+                const response = await this.fetchWithAuth(endpoint, {
                     method: isNewConversation ? 'POST' : 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(conversation)
                 });
                 
@@ -1731,8 +1818,17 @@ class TuneForgeUltimate {
                     // Update the conversation in the UI
                     if (this.currentBin) {
                         if (isNewConversation) {
-                            // For new conversations, reload the list to add it
-                            await this.loadConversationsForBin(this.currentBin.id);
+                            // Update bin count in UI immediately
+                            this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                            
+                            // Ensure bin is expanded to show new conversation
+                            const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                            if (convList && convList.style.display === 'none') {
+                                await this.toggleBinExpanded(this.currentBin.id);
+                            } else {
+                                // For new conversations, reload the list to add it
+                                await this.loadConversationsForBin(this.currentBin.id);
+                            }
                         } else {
                             // For existing conversations, just update the name and turn count
                             this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
@@ -1789,8 +1885,17 @@ class TuneForgeUltimate {
             // Update the conversation in the UI
             if (this.currentBin) {
                 if (isNewConversation) {
-                    // For new conversations, reload the list to add it
-                    await this.loadConversationsForBin(this.currentBin.id);
+                    // Update bin count in UI immediately
+                    this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                    
+                    // Ensure bin is expanded to show new conversation
+                    const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                    if (convList && convList.style.display === 'none') {
+                        await this.toggleBinExpanded(this.currentBin.id);
+                    } else {
+                        // For new conversations, reload the list to add it
+                        await this.loadConversationsForBin(this.currentBin.id);
+                    }
                 } else {
                     // For existing conversations, just update the name and turn count
                     this.updateConversationNameInLists(conversationId, conversation.name || this.currentConversationName);
@@ -1818,7 +1923,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -1987,9 +2092,8 @@ class TuneForgeUltimate {
                     generateParams.maxTokens = maxTokens;
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
@@ -2081,9 +2185,8 @@ class TuneForgeUltimate {
                     Object.assign(generateParams, params);
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
@@ -2245,6 +2348,38 @@ class TuneForgeUltimate {
             this.conversations.reduce((sum, conv) => sum + conv.metadata.turnCount, 0) / this.conversations.length : 0;
         const qualityScore = Math.min(100, Math.round(avgTurns * 20));
         document.getElementById('qualityScore').textContent = qualityScore + '%';
+    }
+    
+    updateBinCount(binId, count) {
+        // Update the bin count display immediately
+        const binEl = document.querySelector(`[data-bin-id="${binId}"]`);
+        if (binEl) {
+            const countEl = binEl.querySelector('.bin-count');
+            if (countEl) {
+                countEl.textContent = count;
+            }
+        }
+        
+        // Also update in the bins list
+        const binIndex = this.bins.findIndex(b => b.id === binId);
+        if (binIndex > -1) {
+            this.bins[binIndex].conversationCount = count;
+        }
+    }
+    
+    updateConversationNameInLists(conversationId, newName) {
+        // Update name in all conversation lists
+        const nameElements = document.querySelectorAll(`[data-conv-name="${conversationId}"]`);
+        nameElements.forEach(el => {
+            el.textContent = newName;
+        });
+        
+        // Also update any conversation items with this ID
+        const convItems = document.querySelectorAll(`[data-conversation-id="${conversationId}"]`);
+        convItems.forEach(item => {
+            const nameEl = item.querySelector('.file-name');
+            if (nameEl) nameEl.textContent = newName;
+        });
     }
     
     // Prompt Management
@@ -2430,6 +2565,123 @@ class TuneForgeUltimate {
     loadDataset() {
         if (!this.isCloudflare && this.socket) {
             this.socket.emit('get-dataset');
+        }
+    }
+    
+    // Recovery methods for failed messages
+    async retryLastMessage() {
+        // Remove any error indicators
+        const flow = document.getElementById('conversationFlow');
+        const errorIndicators = flow.querySelectorAll('.message-error, .message-recovery');
+        errorIndicators.forEach(el => el.remove());
+        
+        // Get the last user message
+        const lastUserMessage = [...this.currentMessages].reverse().find(m => m.role === 'user');
+        if (!lastUserMessage) {
+            this.showNotification('No message to retry', 'warning');
+            return;
+        }
+        
+        // Check if we already have an assistant response after this message
+        const lastUserIndex = this.currentMessages.lastIndexOf(lastUserMessage);
+        if (lastUserIndex < this.currentMessages.length - 1) {
+            this.showNotification('Response already exists', 'info');
+            return;
+        }
+        
+        console.log('[TuneForge] Retrying last message:', {
+            content: lastUserMessage.content.substring(0, 50) + '...',
+            messageIndex: lastUserIndex
+        });
+        
+        // Temporarily remove the message and re-send it
+        this.currentMessages.pop();
+        const messageContent = lastUserMessage.content;
+        
+        // Remove the UI element
+        const lastMessageBlock = flow.lastElementChild;
+        if (lastMessageBlock && lastMessageBlock.querySelector('.user')) {
+            lastMessageBlock.remove();
+        }
+        
+        // Re-add to input and send
+        document.getElementById('userMessage').value = messageContent;
+        await this.sendMessage();
+    }
+    
+    removeLastMessage() {
+        const flow = document.getElementById('conversationFlow');
+        
+        // Remove error indicators
+        const errorIndicators = flow.querySelectorAll('.message-error, .message-recovery');
+        errorIndicators.forEach(el => el.remove());
+        
+        // Get the last user message
+        const lastUserMessage = [...this.currentMessages].reverse().find(m => m.role === 'user');
+        if (!lastUserMessage) {
+            this.showNotification('No message to remove', 'warning');
+            return;
+        }
+        
+        // Check if we already have an assistant response after this message
+        const lastUserIndex = this.currentMessages.lastIndexOf(lastUserMessage);
+        if (lastUserIndex < this.currentMessages.length - 1) {
+            this.showNotification('Cannot remove - response already exists', 'warning');
+            return;
+        }
+        
+        // Remove from messages array
+        this.currentMessages.pop();
+        
+        // Remove from UI
+        const lastMessageBlock = flow.lastElementChild;
+        if (lastMessageBlock && lastMessageBlock.querySelector('.user')) {
+            lastMessageBlock.remove();
+        }
+        
+        // Clear backup
+        sessionStorage.removeItem('tuneforge_pending_message');
+        
+        // Update turn count
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('turnCount').textContent = turnCount;
+        
+        this.showNotification('Message removed', 'success');
+    }
+    
+    // Check for pending messages on load
+    checkPendingMessage() {
+        const pendingStr = sessionStorage.getItem('tuneforge_pending_message');
+        if (!pendingStr) return;
+        
+        try {
+            const pending = JSON.parse(pendingStr);
+            
+            // Check if it's for the current conversation
+            if (pending.binId === this.currentBin?.id && 
+                pending.conversationId === this.currentConversationId) {
+                
+                // Check if message is recent (within last hour)
+                const age = Date.now() - pending.timestamp;
+                if (age < 3600000) { // 1 hour
+                    console.log('[TuneForge] Found pending message:', {
+                        age: Math.round(age / 1000) + 's',
+                        content: pending.content.substring(0, 50) + '...'
+                    });
+                    
+                    // Restore to input field
+                    const input = document.getElementById('userMessage');
+                    if (input && !input.value) {
+                        input.value = pending.content;
+                        this.showNotification('Restored unsent message', 'info');
+                    }
+                }
+            }
+            
+            // Clear old pending message
+            sessionStorage.removeItem('tuneforge_pending_message');
+        } catch (error) {
+            console.error('[TuneForge] Error checking pending message:', error);
         }
     }
 }

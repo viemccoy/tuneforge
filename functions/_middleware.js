@@ -35,7 +35,7 @@ export async function onRequest(context) {
     
     // Set session cookie for future requests
     const response = await context.next();
-    response.headers.set('Set-Cookie', `tuneforge-session=${btoa(password)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`);
+    response.headers.set('Set-Cookie', `tuneforge-session=${btoa(password)}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=86400`);
     return response;
   }
   

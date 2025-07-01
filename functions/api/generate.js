@@ -6,8 +6,19 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  // Log request details for debugging
+  const requestId = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
+  
   try {
     const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens } = await request.json();
+    
+    console.log(`[${timestamp}] Request ${requestId}:`, {
+      binId,
+      messageCount: messages?.length || 0,
+      models: models || [],
+      lastMessage: messages?.length > 0 ? messages[messages.length - 1].content.substring(0, 50) + '...' : 'none'
+    });
     
     if (!binId || !messages || !models || models.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid request' }), {
@@ -160,10 +171,22 @@ export async function onRequestPost(context) {
     
     const responses = await Promise.all(responsePromises);
     
+    // Log response summary
+    const successCount = responses.filter(r => !r.error).length;
+    console.log(`[${timestamp}] Request ${requestId} completed:`, {
+      totalResponses: responses.length,
+      successfulResponses: successCount,
+      failedResponses: responses.length - successCount
+    });
+    
     return new Response(JSON.stringify({ responses }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error(`[${timestamp}] Request ${requestId} error:`, {
+      error: error.message,
+      stack: error.stack
+    });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

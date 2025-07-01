@@ -10,7 +10,7 @@ export async function onRequestPost(context) {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Set-Cookie': `tuneforge-session=${btoa(password)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`
+          'Set-Cookie': `tuneforge-session=${btoa(password)}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=86400`
         }
       });
     }
