@@ -151,6 +151,19 @@ class TuneForgeUltimate {
         
         // Check for any pending messages that may have been lost
         this.checkPendingMessage();
+        
+        // Clean up presence on page unload
+        window.addEventListener('beforeunload', () => {
+            if (this.currentConversationId && this.currentBin) {
+                // Use sendBeacon for reliable cleanup on page close
+                const data = JSON.stringify({
+                    conversationId: this.currentConversationId,
+                    userId: this.userId,
+                    action: 'leave'
+                });
+                navigator.sendBeacon(`${this.apiBase}/presence`, data);
+            }
+        });
     }
     
     initializeEventListeners() {
@@ -570,6 +583,9 @@ class TuneForgeUltimate {
     }
     
     async selectBin(bin, skipNewConversation = false) {
+        // Stop tracking previous bin/conversation
+        await this.stopPresenceTracking();
+        
         this.currentBin = bin;
         
         // Update UI
@@ -599,9 +615,22 @@ class TuneForgeUltimate {
             }
         }, 100);
         
+        // Start polling for presence in this bin
+        if (this.isCloudflare) {
+            // Just start the polling interval for bin presence
+            if (this.presencePollingInterval) {
+                clearInterval(this.presencePollingInterval);
+            }
+            this.presencePollingInterval = setInterval(() => {
+                this.pollPresenceForBin();
+            }, 5000);
+            // Initial poll
+            this.pollPresenceForBin();
+        }
+        
         // Start new conversation only if not loading a specific conversation
         if (!skipNewConversation) {
-            this.clearConversation();
+            await this.clearConversation();
         }
     }
     
@@ -850,7 +879,10 @@ class TuneForgeUltimate {
     }
     
     // Conversation Management
-    loadConversation(conversation) {
+    async loadConversation(conversation) {
+        // Stop tracking previous conversation
+        await this.stopPresenceTracking();
+        
         // Set current conversation details
         this.currentConversationId = conversation.id;
         this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
@@ -881,6 +913,9 @@ class TuneForgeUltimate {
         
         // Focus input for continuation
         document.getElementById('userMessage').focus();
+        
+        // Start presence tracking for new conversation
+        await this.startPresenceTracking();
         
         this.showNotification('Conversation loaded');
     }
@@ -1085,7 +1120,10 @@ class TuneForgeUltimate {
         this.showNewConversationModal();
     }
     
-    clearConversation() {
+    async clearConversation() {
+        // Stop presence tracking
+        await this.stopPresenceTracking();
+        
         // Clear conversation without showing modal (used internally)
         this.currentMessages = [];
         this.currentConversationId = null;
@@ -2558,6 +2596,107 @@ class TuneForgeUltimate {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Presence tracking methods
+    async startPresenceTracking() {
+        if (!this.currentConversationId || !this.currentBin) return;
+        
+        // Join the conversation
+        await this.updatePresence('join');
+        
+        // Start heartbeat interval
+        this.presenceInterval = setInterval(() => {
+            this.updatePresence('heartbeat');
+        }, 30000); // Every 30 seconds
+        
+        // Start polling for presence updates
+        this.presencePollingInterval = setInterval(() => {
+            this.pollPresenceForBin();
+        }, 5000); // Every 5 seconds
+        
+        // Initial poll
+        this.pollPresenceForBin();
+    }
+    
+    async stopPresenceTracking() {
+        if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+            this.presenceInterval = null;
+        }
+        
+        if (this.presencePollingInterval) {
+            clearInterval(this.presencePollingInterval);
+            this.presencePollingInterval = null;
+        }
+        
+        // Leave the conversation
+        if (this.currentConversationId && this.currentBin) {
+            await this.updatePresence('leave');
+        }
+    }
+    
+    async updatePresence(action) {
+        if (!this.isCloudflare || !this.currentConversationId || !this.currentBin) return;
+        
+        try {
+            await this.fetchWithAuth(`${this.apiBase}/presence`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    conversationId: this.currentConversationId,
+                    userId: this.userId,
+                    action: action
+                })
+            });
+        } catch (error) {
+            console.error('Failed to update presence:', error);
+        }
+    }
+    
+    async pollPresenceForBin() {
+        if (!this.isCloudflare || !this.currentBin) return;
+        
+        try {
+            const response = await this.fetchWithAuth(`${this.apiBase}/presence?binId=${this.currentBin.id}`, {
+                method: 'OPTIONS'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.updatePresenceDisplay(data.conversations || {});
+            }
+        } catch (error) {
+            console.error('Failed to poll presence:', error);
+        }
+    }
+    
+    updatePresenceDisplay(presenceData) {
+        // Update each conversation file element with presence info
+        document.querySelectorAll('.conversation-file').forEach(convEl => {
+            const convId = convEl.dataset.conversationId;
+            const viewerCount = presenceData[convId] || 0;
+            
+            // Find or create presence indicator
+            let presenceEl = convEl.querySelector('.presence-indicator');
+            if (!presenceEl && viewerCount > 0) {
+                presenceEl = document.createElement('span');
+                presenceEl.className = 'presence-indicator';
+                const metaEl = convEl.querySelector('.file-meta');
+                if (metaEl) {
+                    metaEl.appendChild(presenceEl);
+                }
+            }
+            
+            if (presenceEl) {
+                if (viewerCount > 0) {
+                    // Use ASCII person icon ⚇ or ◉ or ☺ or ♟ or just 'o' for simplicity
+                    presenceEl.textContent = `◉${viewerCount}`;
+                    presenceEl.style.display = 'inline';
+                } else {
+                    presenceEl.style.display = 'none';
+                }
+            }
+        });
     }
     
     disableGenerationUI() {
