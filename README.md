@@ -2,6 +2,9 @@
 
 Dataset builder for AI fine-tuning. Build high-quality training datasets through a web interface with multi-model support.
 
+![{46897658-6B8A-4AFE-BE7D-EA444E5344F7}](https://github.com/user-attachments/assets/8dccc3be-ba67-40af-9581-a8824310d0ef)
+
+
 ## Features
 
 - **Multi-Model Support**: OpenAI and Anthropic models
