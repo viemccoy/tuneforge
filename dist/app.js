@@ -1017,6 +1017,37 @@ class TuneForgeUltimate {
         
         this.updateConversationNameDisplay();
         
+        // Create a placeholder conversation that will show in the bin immediately
+        const placeholderConv = {
+            id: 'temp_' + Date.now(),
+            binId: this.currentBin.id,
+            name: nameInput,
+            description: description,
+            messages: [],
+            metadata: {
+                createdAt: new Date().toISOString(),
+                turnCount: 0,
+                isPlaceholder: true
+            }
+        };
+        
+        // Add to conversations array temporarily
+        this.conversations.push(placeholderConv);
+        
+        // Update bin count and refresh the list to show the new conversation
+        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+        this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+        
+        // Ensure bin is expanded and refresh list
+        const convList = document.getElementById(`convList-${this.currentBin.id}`);
+        if (convList) {
+            if (convList.style.display === 'none') {
+                await this.toggleBinExpanded(this.currentBin.id);
+            } else {
+                await this.loadConversationsForBin(this.currentBin.id);
+            }
+        }
+        
         // Close modal
         document.getElementById('newConversationModal').classList.remove('active');
         document.getElementById('newConversationName').value = '';
@@ -1801,8 +1832,21 @@ class TuneForgeUltimate {
                     
                     if (isNewConversation) {
                         this.currentConversationId = savedConv.id;
-                        this.conversations.push(savedConv);
-                        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                        
+                        // Remove placeholder if it exists
+                        const placeholderIndex = this.conversations.findIndex(c => 
+                            c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                        );
+                        if (placeholderIndex > -1) {
+                            // Replace placeholder with real conversation
+                            this.conversations[placeholderIndex] = savedConv;
+                            // Don't increment count since we already did when creating placeholder
+                        } else {
+                            // No placeholder, this is a direct save
+                            this.conversations.push(savedConv);
+                            this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                        }
+                        
                         // Enable delete button for new conversation
                         document.getElementById('deleteConversation').disabled = false;
                     } else {
@@ -1854,8 +1898,21 @@ class TuneForgeUltimate {
             if (isNewConversation) {
                 this.currentConversationId = conversationId;
                 allConvs.push(conversation);
-                this.conversations.push(conversation);
-                this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                
+                // Remove placeholder if it exists
+                const placeholderIndex = this.conversations.findIndex(c => 
+                    c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                );
+                if (placeholderIndex > -1) {
+                    // Replace placeholder with real conversation
+                    this.conversations[placeholderIndex] = conversation;
+                    // Don't increment count since we already did when creating placeholder
+                } else {
+                    // No placeholder, this is a direct save
+                    this.conversations.push(conversation);
+                    this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                }
+                
                 // Enable delete button for new conversation
                 document.getElementById('deleteConversation').disabled = false;
             } else {

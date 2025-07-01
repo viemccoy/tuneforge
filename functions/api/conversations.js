@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   
   try {
-    const { binId, messages, metadata } = await request.json();
+    const { binId, name, description, messages, metadata } = await request.json();
     
     if (!binId || !messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Invalid conversation data' }), {
@@ -54,6 +54,8 @@ export async function onRequestPost(context) {
     const key = `${binId}:${convId}`;
     
     const conversationData = {
+      name: name || 'Untitled Conversation',
+      description: description || '',
       messages,
       metadata: {
         ...metadata,
@@ -74,6 +76,59 @@ export async function onRequestPost(context) {
     
     return new Response(JSON.stringify({ id: convId, ...conversationData }), {
       status: 201,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function onRequestPut(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const convId = pathParts.pop();
+  
+  try {
+    const { binId, name, description, messages, metadata } = await request.json();
+    
+    if (!convId || !binId || !messages || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: 'Invalid conversation data' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const key = `${binId}:${convId}`;
+    
+    // Check if conversation exists
+    const existing = await env.CONVERSATIONS.get(key, 'json');
+    if (!existing) {
+      return new Response(JSON.stringify({ error: 'Conversation not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Update conversation data
+    const conversationData = {
+      name: name || existing.name || 'Untitled Conversation',
+      description: description !== undefined ? description : existing.description,
+      messages,
+      metadata: {
+        ...existing.metadata,
+        ...metadata,
+        updatedAt: new Date().toISOString(),
+        turnCount: messages.filter(m => m.role === 'user').length
+      }
+    };
+    
+    await env.CONVERSATIONS.put(key, JSON.stringify(conversationData));
+    
+    return new Response(JSON.stringify({ id: convId, ...conversationData }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
