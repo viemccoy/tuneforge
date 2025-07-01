@@ -496,6 +496,15 @@ class TuneForgeUltimate {
             conversations = allConvs.filter(c => c.binId === binId);
         }
         
+        // Merge with any placeholders for this bin
+        const placeholders = this.conversations.filter(c => 
+            c.binId === binId && 
+            c.metadata?.isPlaceholder && 
+            !conversations.find(conv => conv.name === c.name)
+        );
+        
+        conversations = [...placeholders, ...conversations];
+        
         // Sort conversations by creation date (newest first)
         conversations.sort((a, b) => new Date(b.metadata.createdAt) - new Date(a.metadata.createdAt));
         
@@ -510,6 +519,18 @@ class TuneForgeUltimate {
             const convEl = document.createElement('div');
             convEl.className = 'conversation-file';
             convEl.dataset.conversationId = conv.id; // Add data attribute for easier lookup
+            
+            // Add new-conversation class for placeholders or just-created conversations
+            if (conv.metadata?.isPlaceholder || 
+                (conv.metadata?.createdAt && new Date(conv.metadata.createdAt) > new Date(Date.now() - 5000))) {
+                convEl.classList.add('new-conversation');
+            }
+            
+            // If this is the current conversation, mark it as current
+            if (conv.id === this.currentConversationId || 
+                (conv.metadata?.isPlaceholder && conv.name === this.currentConversationName)) {
+                convEl.classList.add('current');
+            }
             
             const displayName = conv.name || this.getConversationPreview(conv);
             const date = new Date(conv.metadata.createdAt);
