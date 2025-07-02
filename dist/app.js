@@ -29,6 +29,25 @@ class TuneForgeUltimate {
         this.isGenerating = false;
         this.activeRequestId = null;
         
+        // Rate limiting and request protection
+        this.requestTimestamps = new Map();
+        this.rateLimitWindow = 60000; // 1 minute
+        this.maxRequestsPerWindow = 30;
+        this.requestQueue = [];
+        this.processingQueue = false;
+        
+        // Input validation limits
+        this.maxMessageLength = 10000;
+        this.maxConversationNameLength = 100;
+        this.maxBinNameLength = 50;
+        this.maxSystemPromptLength = 2000;
+        
+        // Session management
+        this.sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
+        this.sessionWarningTime = 30 * 60 * 1000; // 30 minutes before expiry
+        this.sessionStartTime = Date.now();
+        this.sessionWarningShown = false;
+        
         // Presence tracking
         this.connectedUsers = new Map();
         this.userId = Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -82,7 +101,40 @@ class TuneForgeUltimate {
             }
         };
         
-        return fetch(url, { ...defaultOptions, ...options });
+        try {
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            
+            // Handle authentication errors globally
+            if (response.status === 401) {
+                this.handleAuthError();
+                throw new Error('Authentication failed');
+            }
+            
+            // Handle rate limiting
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After') || '60';
+                throw new Error(`Rate limit exceeded. Try again in ${retryAfter} seconds.`);
+            }
+            
+            return response;
+        } catch (error) {
+            // Network errors
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                throw new Error('Network error. Please check your connection.');
+            }
+            throw error;
+        }
+    }
+    
+    handleAuthError() {
+        // Only show auth modal once
+        if (!this.authErrorHandled) {
+            this.authErrorHandled = true;
+            this.showNotification('Authentication required. Please log in again.', 'error');
+            setTimeout(() => {
+                this.showAuthModal();
+            }, 1000);
+        }
     }
     
     async authenticate() {
@@ -151,6 +203,14 @@ class TuneForgeUltimate {
         
         // Check for any pending messages that may have been lost
         this.checkPendingMessage();
+        
+        // Start session monitoring
+        if (this.isCloudflare) {
+            this.startSessionMonitoring();
+        }
+        
+        // Network status monitoring
+        this.setupNetworkMonitoring();
         
         // Clean up presence on page unload
         window.addEventListener('beforeunload', () => {
@@ -660,12 +720,22 @@ class TuneForgeUltimate {
     }
     
     async createBin() {
-        const name = document.getElementById('binName').value.trim();
-        const systemPrompt = document.getElementById('binSystemPrompt').value.trim();
-        const description = document.getElementById('binDescription').value.trim();
+        const nameInput = document.getElementById('binName').value;
+        const systemPromptInput = document.getElementById('binSystemPrompt').value;
+        const descriptionInput = document.getElementById('binDescription').value;
         
-        if (!name || !systemPrompt) {
-            alert('Name and system prompt are required');
+        // Validate inputs
+        let name, systemPrompt, description;
+        try {
+            name = this.validateInput(nameInput, 'binName');
+            systemPrompt = this.validateInput(systemPromptInput, 'systemPrompt');
+            description = this.sanitizeInput(descriptionInput);
+            
+            if (!name || !systemPrompt) {
+                throw new Error('Name and system prompt are required');
+            }
+        } catch (error) {
+            this.showNotification(error.message, 'error');
             return;
         }
         
@@ -720,11 +790,23 @@ class TuneForgeUltimate {
             return;
         }
         
-        if (!confirm(`Delete bin "${this.currentBin.name}" and all its conversations?`)) {
-            return;
-        }
+        // Count conversations in this bin
+        const convCount = this.conversations.length;
+        const turnCount = this.conversations.reduce((sum, conv) => 
+            sum + (conv.metadata?.turnCount || 0), 0);
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Delete Bin',
+            message: `Delete "${this.currentBin.name}"?`,
+            details: `This will permanently delete ${convCount} conversation${convCount !== 1 ? 's' : ''} with ${turnCount} total turns.`,
+            confirmText: 'DELETE',
+            dangerous: true
+        });
+        
+        if (!confirmed) return;
         
         console.log('Deleting bin:', this.currentBin.id);
+        this.showLoadingOverlay('Deleting bin...');
         
         if (this.isCloudflare) {
             try {
@@ -748,6 +830,8 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Failed to delete bin:', error);
                 this.showNotification('Failed to delete bin', 'error');
+            } finally {
+                this.hideLoadingOverlay();
             }
         } else {
             // Local storage mode
@@ -1173,11 +1257,27 @@ class TuneForgeUltimate {
             return;
         }
         
-        const message = document.getElementById('userMessage').value.trim();
-        if (!message) return;
+        const messageInput = document.getElementById('userMessage').value;
+        
+        // Validate and sanitize input
+        let message;
+        try {
+            message = this.validateInput(messageInput, 'message');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+            return;
+        }
         
         if (this.selectedModels.length === 0) {
-            alert('Please select at least one model');
+            this.showNotification('Please select at least one model', 'warning');
+            return;
+        }
+        
+        // Check rate limit
+        try {
+            this.checkRateLimit('generate');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
             return;
         }
         
@@ -2064,9 +2164,17 @@ class TuneForgeUltimate {
         }
         
         const conversationName = this.currentConversationName || 'this conversation';
-        if (!confirm(`Delete "${conversationName}"? This cannot be undone.`)) {
-            return;
-        }
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Delete Conversation',
+            message: `Delete "${conversationName}"?`,
+            details: `This conversation has ${turnCount} turn${turnCount !== 1 ? 's' : ''} and will be permanently deleted.`,
+            confirmText: 'DELETE',
+            dangerous: true
+        });
+        
+        if (!confirmed) return;
         
         if (this.isCloudflare) {
             try {
@@ -2627,6 +2735,332 @@ class TuneForgeUltimate {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Enhanced confirmation dialog system
+    async showConfirmDialog(options) {
+        return new Promise((resolve) => {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                details = '',
+                confirmText = 'CONFIRM',
+                cancelText = 'CANCEL',
+                dangerous = false
+            } = options;
+            
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-overlay active';
+            
+            modal.innerHTML = `
+                <div class="confirm-modal ${dangerous ? 'dangerous' : ''}">
+                    <div class="confirm-header">
+                        <h3>${this.escapeHtml(title)}</h3>
+                        <div class="confirm-glow"></div>
+                    </div>
+                    <div class="confirm-body">
+                        <p class="confirm-message">${this.escapeHtml(message)}</p>
+                        ${details ? `<div class="confirm-details">${this.escapeHtml(details)}</div>` : ''}
+                    </div>
+                    <div class="confirm-actions">
+                        <button class="btn btn-cancel" id="confirmCancel">${cancelText}</button>
+                        <button class="btn btn-confirm ${dangerous ? 'btn-danger' : ''}" id="confirmOk">${confirmText}</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Focus confirm button for keyboard navigation
+            setTimeout(() => {
+                document.getElementById('confirmOk').focus();
+            }, 100);
+            
+            // Event handlers
+            const cleanup = () => {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            };
+            
+            const handleConfirm = () => {
+                cleanup();
+                resolve(true);
+            };
+            
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            
+            // Add event listeners
+            document.getElementById('confirmOk').addEventListener('click', handleConfirm);
+            document.getElementById('confirmCancel').addEventListener('click', handleCancel);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) handleCancel();
+            });
+            
+            // Keyboard shortcuts
+            const handleKeydown = (e) => {
+                if (e.key === 'Escape') handleCancel();
+                if (e.key === 'Enter') handleConfirm();
+            };
+            document.addEventListener('keydown', handleKeydown);
+            
+            // Cleanup keyboard listener when modal closes
+            modal.addEventListener('transitionend', () => {
+                if (!modal.classList.contains('active')) {
+                    document.removeEventListener('keydown', handleKeydown);
+                }
+            });
+        });
+    }
+    
+    // Loading overlay system
+    showLoadingOverlay(message = 'Processing...') {
+        // Remove any existing overlay
+        this.hideLoadingOverlay();
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'loading-overlay active';
+        overlay.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                </div>
+                <div class="loading-message">${this.escapeHtml(message)}</div>
+                <div class="loading-progress">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+    }
+    
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+        }
+    }
+    
+    // Rate limiting and validation
+    checkRateLimit(endpoint) {
+        const now = Date.now();
+        const key = `${endpoint}:${this.userId}`;
+        const timestamps = this.requestTimestamps.get(key) || [];
+        
+        // Remove old timestamps outside the window
+        const validTimestamps = timestamps.filter(ts => now - ts < this.rateLimitWindow);
+        
+        if (validTimestamps.length >= this.maxRequestsPerWindow) {
+            const oldestTimestamp = validTimestamps[0];
+            const waitTime = Math.ceil((this.rateLimitWindow - (now - oldestTimestamp)) / 1000);
+            throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds.`);
+        }
+        
+        // Add current timestamp
+        validTimestamps.push(now);
+        this.requestTimestamps.set(key, validTimestamps);
+        
+        return true;
+    }
+    
+    validateInput(input, type) {
+        // Sanitize input first
+        const sanitized = this.sanitizeInput(input);
+        
+        switch (type) {
+            case 'message':
+                if (sanitized.length > this.maxMessageLength) {
+                    throw new Error(`Message too long. Maximum ${this.maxMessageLength} characters allowed.`);
+                }
+                if (sanitized.trim().length === 0) {
+                    throw new Error('Message cannot be empty.');
+                }
+                break;
+                
+            case 'conversationName':
+                if (sanitized.length > this.maxConversationNameLength) {
+                    throw new Error(`Name too long. Maximum ${this.maxConversationNameLength} characters allowed.`);
+                }
+                if (!/^[\w\s\-\.]+$/.test(sanitized)) {
+                    throw new Error('Name can only contain letters, numbers, spaces, hyphens, and periods.');
+                }
+                break;
+                
+            case 'binName':
+                if (sanitized.length > this.maxBinNameLength) {
+                    throw new Error(`Name too long. Maximum ${this.maxBinNameLength} characters allowed.`);
+                }
+                if (!/^[\w\s\-\.]+$/.test(sanitized)) {
+                    throw new Error('Name can only contain letters, numbers, spaces, hyphens, and periods.');
+                }
+                break;
+                
+            case 'systemPrompt':
+                if (sanitized.length > this.maxSystemPromptLength) {
+                    throw new Error(`System prompt too long. Maximum ${this.maxSystemPromptLength} characters allowed.`);
+                }
+                break;
+        }
+        
+        return sanitized;
+    }
+    
+    sanitizeInput(input) {
+        if (typeof input !== 'string') return '';
+        
+        // Remove any potential script tags or HTML
+        return input
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+    }
+    
+    // Request queue management
+    async queueRequest(fn, priority = 0) {
+        return new Promise((resolve, reject) => {
+            this.requestQueue.push({ fn, resolve, reject, priority });
+            this.requestQueue.sort((a, b) => b.priority - a.priority);
+            
+            if (!this.processingQueue) {
+                this.processQueue();
+            }
+        });
+    }
+    
+    async processQueue() {
+        if (this.processingQueue || this.requestQueue.length === 0) return;
+        
+        this.processingQueue = true;
+        
+        while (this.requestQueue.length > 0) {
+            const { fn, resolve, reject } = this.requestQueue.shift();
+            
+            try {
+                const result = await fn();
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+            
+            // Small delay between requests to prevent overwhelming the server
+            await new Promise(r => setTimeout(r, 100));
+        }
+        
+        this.processingQueue = false;
+    }
+    
+    // Session management
+    startSessionMonitoring() {
+        // Check session status every minute
+        this.sessionCheckInterval = setInterval(() => {
+            const elapsed = Date.now() - this.sessionStartTime;
+            const timeUntilExpiry = this.sessionTimeout - elapsed;
+            
+            // Show warning when approaching timeout
+            if (timeUntilExpiry <= this.sessionWarningTime && !this.sessionWarningShown) {
+                this.sessionWarningShown = true;
+                const minutesLeft = Math.ceil(timeUntilExpiry / 60000);
+                
+                this.showConfirmDialog({
+                    title: 'Session Expiring Soon',
+                    message: `Your session will expire in ${minutesLeft} minutes.`,
+                    details: 'Save your work and refresh the page to continue.',
+                    confirmText: 'REFRESH NOW',
+                    cancelText: 'CONTINUE',
+                    dangerous: false
+                }).then(shouldRefresh => {
+                    if (shouldRefresh) {
+                        window.location.reload();
+                    }
+                });
+            }
+            
+            // Force logout when session expires
+            if (timeUntilExpiry <= 0) {
+                clearInterval(this.sessionCheckInterval);
+                this.handleSessionExpired();
+            }
+        }, 60000); // Check every minute
+    }
+    
+    handleSessionExpired() {
+        // Clear sensitive data
+        this.currentMessages = [];
+        this.currentConversationId = null;
+        this.conversations = [];
+        
+        // Show expiry message
+        this.showNotification('Session expired. Please log in again.', 'error');
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+    
+    // Network monitoring
+    setupNetworkMonitoring() {
+        let wasOffline = false;
+        
+        // Check online status
+        const updateOnlineStatus = () => {
+            const isOnline = navigator.onLine;
+            const statusEl = document.getElementById('connectionStatus');
+            const dotEl = document.getElementById('connectionDot');
+            
+            if (isOnline) {
+                if (wasOffline) {
+                    this.showNotification('Connection restored', 'success');
+                    wasOffline = false;
+                    
+                    // Refresh data after reconnection
+                    if (this.currentBin) {
+                        this.loadBinConversations();
+                        this.pollPresenceForBin();
+                    }
+                }
+                statusEl.textContent = 'CONNECTED';
+                dotEl.classList.add('connected');
+                dotEl.classList.remove('offline');
+            } else {
+                if (!wasOffline) {
+                    this.showNotification('Connection lost. Working offline.', 'warning');
+                    wasOffline = true;
+                }
+                statusEl.textContent = 'OFFLINE';
+                dotEl.classList.remove('connected');
+                dotEl.classList.add('offline');
+            }
+        };
+        
+        // Initial check
+        updateOnlineStatus();
+        
+        // Listen for online/offline events
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Periodic connectivity check (more reliable than events)
+        setInterval(() => {
+            if (navigator.onLine) {
+                // Try a lightweight request to verify actual connectivity
+                fetch(`${this.apiBase}/health`, { method: 'HEAD' })
+                    .then(() => updateOnlineStatus())
+                    .catch(() => {
+                        // Network request failed despite navigator.onLine = true
+                        const statusEl = document.getElementById('connectionStatus');
+                        statusEl.textContent = 'CONNECTION ISSUE';
+                    });
+            }
+        }, 30000); // Check every 30 seconds
     }
     
     // Presence tracking methods
