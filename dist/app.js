@@ -1597,13 +1597,13 @@ class TuneForgeUltimate {
                         <div class="regen-section">
                             <h4>CORE PARAMETERS</h4>
                             <div class="control-group">
-                                <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span></label>
-                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
+                                <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${document.getElementById('temperature').value}</span></label>
+                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${document.getElementById('temperature').value}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
                                 <span class="param-help">Randomness (0=deterministic, 2=creative)</span>
                             </div>
                             <div class="control-group">
                                 <label>Max Tokens</label>
-                                <input type="number" id="regen-tokens-${index}" min="100" max="8000" value="${response.maxTokens || 1000}" class="token-input">
+                                <input type="number" id="regen-tokens-${index}" min="100" max="8000" value="${document.getElementById('maxTokensValue').textContent}" class="token-input">
                                 <span class="param-help">Maximum response length</span>
                             </div>
                         </div>
@@ -1824,10 +1824,13 @@ class TuneForgeUltimate {
     }
     
     resetRegenSettings(index) {
-        // Reset all settings to defaults
-        document.getElementById(`regen-temp-${index}`).value = 0.7;
-        document.getElementById(`regen-temp-val-${index}`).textContent = '0.7';
-        document.getElementById(`regen-tokens-${index}`).value = 1000;
+        // Reset all settings to current UI values
+        const currentTemp = document.getElementById('temperature').value;
+        const currentMaxTokens = document.getElementById('maxTokensValue').textContent;
+        
+        document.getElementById(`regen-temp-${index}`).value = currentTemp;
+        document.getElementById(`regen-temp-val-${index}`).textContent = currentTemp;
+        document.getElementById(`regen-tokens-${index}`).value = currentMaxTokens;
         document.getElementById(`regen-top-p-${index}`).value = 1.0;
         document.getElementById(`regen-top-p-val-${index}`).textContent = '1.0';
         document.getElementById(`regen-freq-${index}`).value = 0;
@@ -1838,7 +1841,7 @@ class TuneForgeUltimate {
         document.getElementById(`regen-instructions-${index}`).value = '';
         document.getElementById(`regen-variations-${index}`).value = '1';
         
-        this.showNotification('Settings reset to defaults');
+        this.showNotification('Settings reset to current values');
     }
     
     async regenerateSingle(index) {

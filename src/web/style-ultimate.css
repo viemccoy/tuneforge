@@ -829,7 +829,7 @@
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
-    z-index: 5;
+    z-index: 15; /* Higher z-index to ensure it's always on top */
     display: flex;
     align-items: center;
 }
@@ -1024,7 +1024,7 @@
 .response-actions {
     position: absolute;
     top: 0.5rem;
-    right: 4.5rem; /* Moved further left to avoid overlap with OK button */
+    right: 6rem; /* Moved further left to avoid overlap with OK button */
     display: flex;
     gap: 0.5rem;
     opacity: 0;
@@ -1237,6 +1237,22 @@ input:disabled, textarea:disabled, button:disabled {
 /* Adjust action button spacing to prevent overlap */
 .action-btn {
     margin-left: 0.25rem;
+}
+
+/* OK button specific styling for better visibility */
+.select-btn {
+    background: var(--matrix-green-dim);
+    color: #000000;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border: 2px solid var(--matrix-green);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+.select-btn:hover {
+    background: var(--matrix-green);
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+    transform: scale(1.05);
 }
 
 /* Ensure menus appear outside the card bounds */
