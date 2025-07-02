@@ -967,6 +967,9 @@ class TuneForgeUltimate {
         // Stop tracking previous conversation
         await this.stopPresenceTracking();
         
+        // Clear any active loom from previous conversation
+        this.activeLoom = null;
+        
         // Set current conversation details
         this.currentConversationId = conversation.id;
         this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
@@ -1142,6 +1145,7 @@ class TuneForgeUltimate {
         this.currentConversationId = null;
         this.currentConversationName = nameInput;
         this.currentConversationDescription = description;
+        this.activeLoom = null; // Clear any existing loom
         
         document.getElementById('conversationFlow').innerHTML = `
             <div class="empty-state">
@@ -1207,6 +1211,9 @@ class TuneForgeUltimate {
     async clearConversation() {
         // Stop presence tracking
         await this.stopPresenceTracking();
+        
+        // Clear any active loom
+        this.activeLoom = null;
         
         // Clear conversation without showing modal (used internally)
         this.currentMessages = [];
