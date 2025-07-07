@@ -96,8 +96,8 @@ export async function onRequestPost(context) {
               total_tokens: completion.usage.input_tokens + completion.usage.output_tokens
             }
           };
-        } else if (modelId.startsWith('deepseek') && openrouter) {
-          // Handle Deepseek models through OpenRouter
+        } else if ((modelId.startsWith('deepseek') || modelId.startsWith('x-ai/grok')) && openrouter) {
+          // Handle Deepseek and Grok models through OpenRouter
           const completion = await openrouter.chat.completions.create({
             model: modelId,
             messages: [

@@ -900,7 +900,8 @@ class TuneForgeUltimate {
                 { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
                 { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
-                { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.5 Flash', provider: 'google' },
+                { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
+                { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
                 { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
             ];
         } else {
