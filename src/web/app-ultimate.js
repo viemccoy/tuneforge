@@ -204,6 +204,24 @@ class TuneForgeUltimate {
         // Check for any pending messages that may have been lost
         this.checkPendingMessage();
         
+        // Check for recovery data after bins are loaded
+        const recoveryData = this.checkForRecoveryData();
+        if (recoveryData) {
+            const confirmed = await this.showConfirmDialog({
+                title: 'Recover Previous Session',
+                message: 'Found unsaved work from a previous session.',
+                details: `${recoveryData.messages.length} messages in bin "${recoveryData.binId}"`,
+                confirmText: 'RECOVER',
+                cancelText: 'DISCARD'
+            });
+            
+            if (confirmed) {
+                await this.recoverConversation(recoveryData);
+            } else {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+            }
+        }
+        
         // Start session monitoring
         if (this.isCloudflare) {
             this.startSessionMonitoring();
@@ -212,8 +230,11 @@ class TuneForgeUltimate {
         // Network status monitoring
         this.setupNetworkMonitoring();
         
+        // Start periodic saves
+        this.startPeriodicSaves();
+        
         // Clean up presence on page unload
-        window.addEventListener('beforeunload', () => {
+        window.addEventListener('beforeunload', (e) => {
             if (this.currentConversationId && this.currentBin) {
                 // Use sendBeacon for reliable cleanup on page close
                 const data = JSON.stringify({
@@ -223,6 +244,21 @@ class TuneForgeUltimate {
                 });
                 navigator.sendBeacon(`${this.apiBase}/presence`, data);
             }
+            
+            // Save conversation state one more time before unload
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+                
+                // If there's an active loom (unselected responses), warn the user
+                if (this.activeLoom) {
+                    e.preventDefault();
+                    e.returnValue = 'You have unselected AI responses. Are you sure you want to leave?';
+                    return e.returnValue;
+                }
+            }
+            
+            // Stop periodic saves
+            this.stopPeriodicSaves();
         });
     }
     
@@ -1316,6 +1352,9 @@ class TuneForgeUltimate {
         this.currentMessages.push({ role: 'user', content: message });
         this.addMessageToUI({ role: 'user', content: message });
         
+        // Save to session storage after adding user message
+        this.saveConversationToSessionStorage();
+        
         // Clear input
         document.getElementById('userMessage').value = '';
         
@@ -1531,8 +1570,25 @@ class TuneForgeUltimate {
         this.activeLoom = {
             element: loomEl,
             responses: data.responses,
-            currentIndex: 0
+            currentIndex: 0,
+            createdAt: Date.now()
         };
+        
+        // Log unselected loom for debugging
+        console.log('[TuneForge] Loom created with responses:', {
+            responseCount: data.responses.length,
+            models: data.responses.map(r => r.model),
+            messageCount: this.currentMessages.length,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Save pending loom to session storage
+        const pendingLoom = {
+            responses: data.responses,
+            messageCountBeforeLoom: this.currentMessages.length,
+            createdAt: Date.now()
+        };
+        sessionStorage.setItem('tuneforge_pending_loom', JSON.stringify(pendingLoom));
         
         // Focus the loom for keyboard navigation
         const loomElement = loomEl.querySelector('.completion-loom');
@@ -1708,12 +1764,24 @@ class TuneForgeUltimate {
         const response = this.activeLoom.responses[index];
         if (!response || response.error) return;
         
+        // Log selection for debugging
+        console.log('[TuneForge] Selecting response:', {
+            index,
+            model: response.model,
+            messageCount: this.currentMessages.length,
+            conversationId: this.currentConversationId,
+            timestamp: new Date().toISOString()
+        });
+        
         // Add to messages
         this.currentMessages.push({
             role: 'assistant',
             content: response.content,
             model: response.model
         });
+        
+        // Save to session storage immediately for recovery
+        this.saveConversationToSessionStorage();
         
         // Replace loom with message
         const messageEl = document.createElement('div');
@@ -1733,7 +1801,11 @@ class TuneForgeUltimate {
             setTimeout(() => this.loom.addLoomIcons(), 100);
         }
         
+        // Clear pending loom from session storage
+        sessionStorage.removeItem('tuneforge_pending_loom');
+        
         // Auto-save the conversation after selecting a response
+        console.log('[TuneForge] Auto-saving after response selection');
         this.saveConversation(true);
         
         // Focus input for next message
@@ -2746,6 +2818,106 @@ class TuneForgeUltimate {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Periodic saves
+    startPeriodicSaves() {
+        // Save every 30 seconds if there's an active conversation
+        this.periodicSaveInterval = setInterval(() => {
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+            }
+        }, 30000);
+    }
+    
+    stopPeriodicSaves() {
+        if (this.periodicSaveInterval) {
+            clearInterval(this.periodicSaveInterval);
+            this.periodicSaveInterval = null;
+        }
+    }
+    
+    // Session storage methods for recovery
+    saveConversationToSessionStorage() {
+        if (!this.currentBin || !this.currentMessages.length) return;
+        
+        const recoveryData = {
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId,
+            conversationName: this.currentConversationName,
+            conversationDescription: this.currentConversationDescription,
+            messages: this.currentMessages,
+            systemPrompt: document.getElementById('systemPrompt').value,
+            timestamp: Date.now()
+        };
+        
+        sessionStorage.setItem('tuneforge_conversation_recovery', JSON.stringify(recoveryData));
+        console.log('[TuneForge] Saved conversation to session storage for recovery');
+    }
+    
+    checkForRecoveryData() {
+        const recoveryDataStr = sessionStorage.getItem('tuneforge_conversation_recovery');
+        if (!recoveryDataStr) return false;
+        
+        try {
+            const recoveryData = JSON.parse(recoveryDataStr);
+            const age = Date.now() - recoveryData.timestamp;
+            
+            // Only offer recovery if data is less than 1 hour old
+            if (age > 3600000) {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+                return false;
+            }
+            
+            return recoveryData;
+        } catch (error) {
+            console.error('Failed to parse recovery data:', error);
+            sessionStorage.removeItem('tuneforge_conversation_recovery');
+            return false;
+        }
+    }
+    
+    async recoverConversation(recoveryData) {
+        console.log('[TuneForge] Recovering conversation:', {
+            binId: recoveryData.binId,
+            messageCount: recoveryData.messages.length,
+            age: Date.now() - recoveryData.timestamp
+        });
+        
+        // Select the bin
+        const bin = this.bins.find(b => b.id === recoveryData.binId);
+        if (bin) {
+            await this.selectBin(bin.id);
+        }
+        
+        // Restore messages
+        this.currentMessages = recoveryData.messages;
+        this.currentConversationId = recoveryData.conversationId;
+        this.currentConversationName = recoveryData.conversationName || '';
+        this.currentConversationDescription = recoveryData.conversationDescription || '';
+        
+        // Restore system prompt
+        if (recoveryData.systemPrompt) {
+            document.getElementById('systemPrompt').value = recoveryData.systemPrompt;
+        }
+        
+        // Rebuild UI
+        document.getElementById('conversationFlow').innerHTML = '';
+        this.currentMessages.forEach(msg => this.addMessageToUI(msg));
+        
+        // Update UI state
+        this.updateConversationNameDisplay();
+        document.getElementById('saveConversation').disabled = false;
+        document.getElementById('deleteConversation').disabled = !!this.currentConversationId;
+        
+        // Update turn count
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('turnCount').textContent = turnCount;
+        
+        this.showNotification('Conversation recovered from previous session', 'success');
+        
+        // Clear recovery data
+        sessionStorage.removeItem('tuneforge_conversation_recovery');
     }
     
     // Enhanced confirmation dialog system
