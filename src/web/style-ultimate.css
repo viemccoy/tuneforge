@@ -1,5 +1,54 @@
 /* Ultimate UI Enhancements - Merging Original + Bin Management */
 
+/* User Authentication Styles */
+.auth-message {
+    color: var(--matrix-green);
+    font-size: 0.9em;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(0, 255, 65, 0.3);
+}
+
+.user-email {
+    color: var(--matrix-green);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.team-indicator {
+    color: var(--matrix-green-dim);
+    font-size: 0.85em;
+    font-family: 'Courier New', monospace;
+}
+
+.logout-btn {
+    padding: 0.25rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+}
+
+.auth-input[type="email"] {
+    font-family: 'Courier New', monospace;
+}
+
 /* Layout adjustments for bin-aware interface */
 .main-content {
     grid-template-columns: 350px 1fr 280px;

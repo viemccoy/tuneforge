@@ -42,11 +42,7 @@ class TuneForgeUltimate {
         this.maxBinNameLength = 50;
         this.maxSystemPromptLength = 2000;
         
-        // Session management
-        this.sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
-        this.sessionWarningTime = 30 * 60 * 1000; // 30 minutes before expiry
-        this.sessionStartTime = Date.now();
-        this.sessionWarningShown = false;
+        // No session timeouts - sessions persist forever
         
         // Presence tracking
         this.connectedUsers = new Map();
@@ -63,6 +59,9 @@ class TuneForgeUltimate {
     }
     
     async initializeAuth() {
+        // Store user info
+        this.currentUser = null;
+        
         if (this.isCloudflare) {
             // Check if already authenticated
             try {
@@ -84,11 +83,18 @@ class TuneForgeUltimate {
             this.initialize();
         }
         
-        // Auth form handler
+        // Auth form handlers
         document.getElementById('authSubmit').addEventListener('click', () => this.authenticate());
+        document.getElementById('authEmail').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.authenticate();
+        });
         document.getElementById('authPassword').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.authenticate();
         });
+        document.getElementById('authPasswordConfirm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.authenticate();
+        });
+        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
     }
     
     // Helper method for authenticated fetch requests
@@ -138,33 +144,141 @@ class TuneForgeUltimate {
     }
     
     async authenticate() {
-        const password = document.getElementById('authPassword').value;
+        const emailInput = document.getElementById('authEmail');
+        const passwordInput = document.getElementById('authPassword');
+        const passwordConfirmInput = document.getElementById('authPasswordConfirm');
         const errorEl = document.getElementById('authError');
+        const messageEl = document.getElementById('authMessage');
+        
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const passwordConfirm = passwordConfirmInput.value;
+        
+        if (!email) {
+            errorEl.textContent = 'Email required';
+            return;
+        }
         
         try {
-            const response = await this.fetchWithAuth(`${this.apiBase}/auth`, {
-                method: 'POST',
-                body: JSON.stringify({ password })
-            });
+            // First, check if password creation is needed
+            if (!passwordInput.style.display || passwordInput.style.display === 'none') {
+                const checkResponse = await fetch(`${this.apiBase}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const checkData = await checkResponse.json();
+                
+                if (checkData.requiresPassword) {
+                    // Show password creation fields
+                    passwordInput.style.display = 'block';
+                    passwordConfirmInput.style.display = 'block';
+                    passwordInput.focus();
+                    messageEl.textContent = checkData.message || 'Create your password';
+                    errorEl.textContent = '';
+                    return;
+                } else if (!checkResponse.ok) {
+                    // Not a morpheus.systems email
+                    passwordInput.style.display = 'block';
+                    passwordInput.focus();
+                    messageEl.textContent = 'Enter your password';
+                    errorEl.textContent = '';
+                    return;
+                }
+            }
             
-            const data = await response.json();
-            
-            if (data.success) {
-                this.authenticated = true;
-                this.hideAuthModal();
-                this.initialize();
-            } else {
-                errorEl.textContent = 'Invalid password';
-                document.getElementById('authPassword').value = '';
+            // If we have a password confirm field visible, this is password creation
+            if (passwordConfirmInput.style.display === 'block' && passwordConfirm) {
+                if (password !== passwordConfirm) {
+                    errorEl.textContent = 'Passwords do not match';
+                    return;
+                }
+                
+                if (password.length < 8) {
+                    errorEl.textContent = 'Password must be at least 8 characters';
+                    return;
+                }
+                
+                // Create password
+                const createResponse = await fetch(`${this.apiBase}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password, passwordConfirm })
+                });
+                
+                const createData = await createResponse.json();
+                
+                if (createData.success) {
+                    this.currentUser = createData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(createData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = createData.error || 'Password creation failed';
+                }
+            } else if (password) {
+                // Normal login
+                const loginResponse = await fetch(`${this.apiBase}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const loginData = await loginResponse.json();
+                
+                if (loginData.requiresPassword) {
+                    // First login, need to create password
+                    passwordConfirmInput.style.display = 'block';
+                    messageEl.textContent = loginData.message || 'Create your password';
+                    errorEl.textContent = '';
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                } else if (loginData.success) {
+                    this.currentUser = loginData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(loginData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = loginData.error || 'Invalid credentials';
+                    passwordInput.value = '';
+                }
             }
         } catch (error) {
+            console.error('Auth error:', error);
             errorEl.textContent = 'Authentication failed';
         }
     }
     
+    showUserInfo(user) {
+        document.getElementById('userInfo').style.display = 'flex';
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userTeam').textContent = `[${user.teamId}]`;
+    }
+    
+    async logout() {
+        try {
+            await fetch(`${this.apiBase}/users`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        
+        // Clear local state and reload
+        this.authenticated = false;
+        this.currentUser = null;
+        window.location.reload();
+    }
+    
     showAuthModal() {
         document.getElementById('authModal').classList.add('active');
-        document.getElementById('authPassword').focus();
+        document.getElementById('authEmail').focus();
     }
     
     hideAuthModal() {
@@ -204,16 +318,34 @@ class TuneForgeUltimate {
         // Check for any pending messages that may have been lost
         this.checkPendingMessage();
         
-        // Start session monitoring
-        if (this.isCloudflare) {
-            this.startSessionMonitoring();
+        // Check for recovery data after bins are loaded
+        const recoveryData = this.checkForRecoveryData();
+        if (recoveryData) {
+            const confirmed = await this.showConfirmDialog({
+                title: 'Recover Previous Session',
+                message: 'Found unsaved work from a previous session.',
+                details: `${recoveryData.messages.length} messages in bin "${recoveryData.binId}"`,
+                confirmText: 'RECOVER',
+                cancelText: 'DISCARD'
+            });
+            
+            if (confirmed) {
+                await this.recoverConversation(recoveryData);
+            } else {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+            }
         }
+        
+        // No session monitoring - sessions persist forever
         
         // Network status monitoring
         this.setupNetworkMonitoring();
         
+        // Start periodic saves
+        this.startPeriodicSaves();
+        
         // Clean up presence on page unload
-        window.addEventListener('beforeunload', () => {
+        window.addEventListener('beforeunload', (e) => {
             if (this.currentConversationId && this.currentBin) {
                 // Use sendBeacon for reliable cleanup on page close
                 const data = JSON.stringify({
@@ -223,6 +355,21 @@ class TuneForgeUltimate {
                 });
                 navigator.sendBeacon(`${this.apiBase}/presence`, data);
             }
+            
+            // Save conversation state one more time before unload
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+                
+                // If there's an active loom (unselected responses), warn the user
+                if (this.activeLoom) {
+                    e.preventDefault();
+                    e.returnValue = 'You have unselected AI responses. Are you sure you want to leave?';
+                    return e.returnValue;
+                }
+            }
+            
+            // Stop periodic saves
+            this.stopPeriodicSaves();
         });
     }
     
@@ -1316,6 +1463,9 @@ class TuneForgeUltimate {
         this.currentMessages.push({ role: 'user', content: message });
         this.addMessageToUI({ role: 'user', content: message });
         
+        // Save to session storage after adding user message
+        this.saveConversationToSessionStorage();
+        
         // Clear input
         document.getElementById('userMessage').value = '';
         
@@ -1531,8 +1681,25 @@ class TuneForgeUltimate {
         this.activeLoom = {
             element: loomEl,
             responses: data.responses,
-            currentIndex: 0
+            currentIndex: 0,
+            createdAt: Date.now()
         };
+        
+        // Log unselected loom for debugging
+        console.log('[TuneForge] Loom created with responses:', {
+            responseCount: data.responses.length,
+            models: data.responses.map(r => r.model),
+            messageCount: this.currentMessages.length,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Save pending loom to session storage
+        const pendingLoom = {
+            responses: data.responses,
+            messageCountBeforeLoom: this.currentMessages.length,
+            createdAt: Date.now()
+        };
+        sessionStorage.setItem('tuneforge_pending_loom', JSON.stringify(pendingLoom));
         
         // Focus the loom for keyboard navigation
         const loomElement = loomEl.querySelector('.completion-loom');
@@ -1708,12 +1875,24 @@ class TuneForgeUltimate {
         const response = this.activeLoom.responses[index];
         if (!response || response.error) return;
         
+        // Log selection for debugging
+        console.log('[TuneForge] Selecting response:', {
+            index,
+            model: response.model,
+            messageCount: this.currentMessages.length,
+            conversationId: this.currentConversationId,
+            timestamp: new Date().toISOString()
+        });
+        
         // Add to messages
         this.currentMessages.push({
             role: 'assistant',
             content: response.content,
             model: response.model
         });
+        
+        // Save to session storage immediately for recovery
+        this.saveConversationToSessionStorage();
         
         // Replace loom with message
         const messageEl = document.createElement('div');
@@ -1733,7 +1912,11 @@ class TuneForgeUltimate {
             setTimeout(() => this.loom.addLoomIcons(), 100);
         }
         
+        // Clear pending loom from session storage
+        sessionStorage.removeItem('tuneforge_pending_loom');
+        
         // Auto-save the conversation after selecting a response
+        console.log('[TuneForge] Auto-saving after response selection');
         this.saveConversation(true);
         
         // Focus input for next message
@@ -2746,6 +2929,106 @@ class TuneForgeUltimate {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Periodic saves
+    startPeriodicSaves() {
+        // Save every 30 seconds if there's an active conversation
+        this.periodicSaveInterval = setInterval(() => {
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+            }
+        }, 30000);
+    }
+    
+    stopPeriodicSaves() {
+        if (this.periodicSaveInterval) {
+            clearInterval(this.periodicSaveInterval);
+            this.periodicSaveInterval = null;
+        }
+    }
+    
+    // Session storage methods for recovery
+    saveConversationToSessionStorage() {
+        if (!this.currentBin || !this.currentMessages.length) return;
+        
+        const recoveryData = {
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId,
+            conversationName: this.currentConversationName,
+            conversationDescription: this.currentConversationDescription,
+            messages: this.currentMessages,
+            systemPrompt: document.getElementById('systemPrompt').value,
+            timestamp: Date.now()
+        };
+        
+        sessionStorage.setItem('tuneforge_conversation_recovery', JSON.stringify(recoveryData));
+        console.log('[TuneForge] Saved conversation to session storage for recovery');
+    }
+    
+    checkForRecoveryData() {
+        const recoveryDataStr = sessionStorage.getItem('tuneforge_conversation_recovery');
+        if (!recoveryDataStr) return false;
+        
+        try {
+            const recoveryData = JSON.parse(recoveryDataStr);
+            const age = Date.now() - recoveryData.timestamp;
+            
+            // Only offer recovery if data is less than 1 hour old
+            if (age > 3600000) {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+                return false;
+            }
+            
+            return recoveryData;
+        } catch (error) {
+            console.error('Failed to parse recovery data:', error);
+            sessionStorage.removeItem('tuneforge_conversation_recovery');
+            return false;
+        }
+    }
+    
+    async recoverConversation(recoveryData) {
+        console.log('[TuneForge] Recovering conversation:', {
+            binId: recoveryData.binId,
+            messageCount: recoveryData.messages.length,
+            age: Date.now() - recoveryData.timestamp
+        });
+        
+        // Select the bin
+        const bin = this.bins.find(b => b.id === recoveryData.binId);
+        if (bin) {
+            await this.selectBin(bin.id);
+        }
+        
+        // Restore messages
+        this.currentMessages = recoveryData.messages;
+        this.currentConversationId = recoveryData.conversationId;
+        this.currentConversationName = recoveryData.conversationName || '';
+        this.currentConversationDescription = recoveryData.conversationDescription || '';
+        
+        // Restore system prompt
+        if (recoveryData.systemPrompt) {
+            document.getElementById('systemPrompt').value = recoveryData.systemPrompt;
+        }
+        
+        // Rebuild UI
+        document.getElementById('conversationFlow').innerHTML = '';
+        this.currentMessages.forEach(msg => this.addMessageToUI(msg));
+        
+        // Update UI state
+        this.updateConversationNameDisplay();
+        document.getElementById('saveConversation').disabled = false;
+        document.getElementById('deleteConversation').disabled = !!this.currentConversationId;
+        
+        // Update turn count
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('turnCount').textContent = turnCount;
+        
+        this.showNotification('Conversation recovered from previous session', 'success');
+        
+        // Clear recovery data
+        sessionStorage.removeItem('tuneforge_conversation_recovery');
     }
     
     // Enhanced confirmation dialog system

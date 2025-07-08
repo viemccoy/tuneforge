@@ -42,11 +42,7 @@ class TuneForgeUltimate {
         this.maxBinNameLength = 50;
         this.maxSystemPromptLength = 2000;
         
-        // Session management
-        this.sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
-        this.sessionWarningTime = 30 * 60 * 1000; // 30 minutes before expiry
-        this.sessionStartTime = Date.now();
-        this.sessionWarningShown = false;
+        // No session timeouts - sessions persist forever
         
         // Presence tracking
         this.connectedUsers = new Map();
@@ -63,6 +59,9 @@ class TuneForgeUltimate {
     }
     
     async initializeAuth() {
+        // Store user info
+        this.currentUser = null;
+        
         if (this.isCloudflare) {
             // Check if already authenticated
             try {
@@ -84,11 +83,18 @@ class TuneForgeUltimate {
             this.initialize();
         }
         
-        // Auth form handler
+        // Auth form handlers
         document.getElementById('authSubmit').addEventListener('click', () => this.authenticate());
+        document.getElementById('authEmail').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.authenticate();
+        });
         document.getElementById('authPassword').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.authenticate();
         });
+        document.getElementById('authPasswordConfirm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.authenticate();
+        });
+        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
     }
     
     // Helper method for authenticated fetch requests
@@ -138,33 +144,141 @@ class TuneForgeUltimate {
     }
     
     async authenticate() {
-        const password = document.getElementById('authPassword').value;
+        const emailInput = document.getElementById('authEmail');
+        const passwordInput = document.getElementById('authPassword');
+        const passwordConfirmInput = document.getElementById('authPasswordConfirm');
         const errorEl = document.getElementById('authError');
+        const messageEl = document.getElementById('authMessage');
+        
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const passwordConfirm = passwordConfirmInput.value;
+        
+        if (!email) {
+            errorEl.textContent = 'Email required';
+            return;
+        }
         
         try {
-            const response = await this.fetchWithAuth(`${this.apiBase}/auth`, {
-                method: 'POST',
-                body: JSON.stringify({ password })
-            });
+            // First, check if password creation is needed
+            if (!passwordInput.style.display || passwordInput.style.display === 'none') {
+                const checkResponse = await fetch(`${this.apiBase}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const checkData = await checkResponse.json();
+                
+                if (checkData.requiresPassword) {
+                    // Show password creation fields
+                    passwordInput.style.display = 'block';
+                    passwordConfirmInput.style.display = 'block';
+                    passwordInput.focus();
+                    messageEl.textContent = checkData.message || 'Create your password';
+                    errorEl.textContent = '';
+                    return;
+                } else if (!checkResponse.ok) {
+                    // Not a morpheus.systems email
+                    passwordInput.style.display = 'block';
+                    passwordInput.focus();
+                    messageEl.textContent = 'Enter your password';
+                    errorEl.textContent = '';
+                    return;
+                }
+            }
             
-            const data = await response.json();
-            
-            if (data.success) {
-                this.authenticated = true;
-                this.hideAuthModal();
-                this.initialize();
-            } else {
-                errorEl.textContent = 'Invalid password';
-                document.getElementById('authPassword').value = '';
+            // If we have a password confirm field visible, this is password creation
+            if (passwordConfirmInput.style.display === 'block' && passwordConfirm) {
+                if (password !== passwordConfirm) {
+                    errorEl.textContent = 'Passwords do not match';
+                    return;
+                }
+                
+                if (password.length < 8) {
+                    errorEl.textContent = 'Password must be at least 8 characters';
+                    return;
+                }
+                
+                // Create password
+                const createResponse = await fetch(`${this.apiBase}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password, passwordConfirm })
+                });
+                
+                const createData = await createResponse.json();
+                
+                if (createData.success) {
+                    this.currentUser = createData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(createData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = createData.error || 'Password creation failed';
+                }
+            } else if (password) {
+                // Normal login
+                const loginResponse = await fetch(`${this.apiBase}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const loginData = await loginResponse.json();
+                
+                if (loginData.requiresPassword) {
+                    // First login, need to create password
+                    passwordConfirmInput.style.display = 'block';
+                    messageEl.textContent = loginData.message || 'Create your password';
+                    errorEl.textContent = '';
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                } else if (loginData.success) {
+                    this.currentUser = loginData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(loginData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = loginData.error || 'Invalid credentials';
+                    passwordInput.value = '';
+                }
             }
         } catch (error) {
+            console.error('Auth error:', error);
             errorEl.textContent = 'Authentication failed';
         }
     }
     
+    showUserInfo(user) {
+        document.getElementById('userInfo').style.display = 'flex';
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userTeam').textContent = `[${user.teamId}]`;
+    }
+    
+    async logout() {
+        try {
+            await fetch(`${this.apiBase}/users`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        
+        // Clear local state and reload
+        this.authenticated = false;
+        this.currentUser = null;
+        window.location.reload();
+    }
+    
     showAuthModal() {
         document.getElementById('authModal').classList.add('active');
-        document.getElementById('authPassword').focus();
+        document.getElementById('authEmail').focus();
     }
     
     hideAuthModal() {
@@ -222,10 +336,7 @@ class TuneForgeUltimate {
             }
         }
         
-        // Start session monitoring
-        if (this.isCloudflare) {
-            this.startSessionMonitoring();
-        }
+        // No session monitoring - sessions persist forever
         
         // Network status monitoring
         this.setupNetworkMonitoring();

@@ -22,7 +22,7 @@ function logEvent(env, event, data) {
 }
 
 export async function onRequestGet(context) {
-  const { request, env } = context;
+  const { request, env, user } = context;
   const url = new URL(request.url);
   const binId = url.searchParams.get('binId');
   
@@ -36,6 +36,21 @@ export async function onRequestGet(context) {
     logEvent(env, 'conversation_list_error', { error: 'Bin ID required' });
     return new Response(JSON.stringify({ error: 'Bin ID required' }), {
       status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  // Verify bin belongs to user's team
+  const bin = await env.BINS.get(binId, 'json');
+  if (!bin || bin.teamId !== user.teamId) {
+    logEvent(env, 'conversation_list_error', { 
+      error: 'Access denied',
+      binId,
+      userTeam: user.teamId,
+      binTeam: bin?.teamId
+    });
+    return new Response(JSON.stringify({ error: 'Access denied' }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -89,7 +104,7 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, user } = context;
   
   logEvent(env, 'conversation_create_request', {
     url: request.url,
@@ -115,6 +130,21 @@ export async function onRequestPost(context) {
       });
       return new Response(JSON.stringify({ error: 'Invalid conversation data' }), {
         status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Verify bin belongs to user's team
+    const bin = await env.BINS.get(binId, 'json');
+    if (!bin || bin.teamId !== user.teamId) {
+      logEvent(env, 'conversation_create_error', { 
+        error: 'Access denied',
+        binId,
+        userTeam: user.teamId,
+        binTeam: bin?.teamId
+      });
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
+        status: 403,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -188,7 +218,7 @@ export async function onRequestPost(context) {
 }
 
 export async function onRequestPut(context) {
-  const { request, env } = context;
+  const { request, env, user } = context;
   const url = new URL(request.url);
   const pathParts = url.pathname.split('/');
   const convId = pathParts.pop();
@@ -296,7 +326,7 @@ export async function onRequestPut(context) {
 }
 
 export async function onRequestDelete(context) {
-  const { request, env } = context;
+  const { request, env, user } = context;
   const url = new URL(request.url);
   const pathParts = url.pathname.split('/');
   const convId = pathParts.pop();

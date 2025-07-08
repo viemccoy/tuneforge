@@ -7,7 +7,9 @@ export async function onRequestGet({ request, env, params, waitUntil, next, data
       keys: env ? Object.keys(env) : [],
       hasBINS: !!env?.BINS,
       hasCONVERSATIONS: !!env?.CONVERSATIONS,
-      hasAUTH_PASSWORD: !!env?.AUTH_PASSWORD,
+      hasUSERS: !!env?.USERS,
+      hasTEAMS: !!env?.TEAMS,
+      hasSESSIONS: !!env?.SESSIONS,
       bindings: {
         BINS: {
           exists: !!env?.BINS,

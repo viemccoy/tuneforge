@@ -16,8 +16,11 @@
             <div class="modal-content auth-modal">
                 <h2>TUNEFORGE ACCESS</h2>
                 <div class="auth-form">
-                    <input type="password" id="authPassword" placeholder="Enter password..." class="auth-input" autofocus>
+                    <input type="email" id="authEmail" placeholder="email@domain.com" class="auth-input" required>
+                    <input type="password" id="authPassword" placeholder="password" class="auth-input" style="display: none;">
+                    <input type="password" id="authPasswordConfirm" placeholder="confirm password" class="auth-input" style="display: none;">
                     <button id="authSubmit" class="btn btn-primary">AUTHENTICATE</button>
+                    <div id="authMessage" class="auth-message"></div>
                     <div id="authError" class="error-message"></div>
                 </div>
             </div>
@@ -41,6 +44,11 @@
                     <div class="status-item">
                         <span class="status-label">DATASET:</span>
                         <span class="status-value" id="datasetCount">0</span>
+                    </div>
+                    <div class="user-info" id="userInfo" style="display: none;">
+                        <span class="user-email" id="userEmail"></span>
+                        <span class="team-indicator" id="userTeam"></span>
+                        <button class="logout-btn" id="logoutBtn">LOGOUT</button>
                     </div>
                 </div>
             </div>

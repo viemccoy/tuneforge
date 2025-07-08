@@ -1,67 +1,72 @@
-// Authentication middleware for all API routes
+// Middleware for session-based authentication
+
+const PUBLIC_PATHS = [
+  '/api/auth',
+  '/api/users',
+  '/api/test'
+];
+
 export async function onRequest(context) {
-  const { request, env } = context;
+  const { request, env, next } = context;
   const url = new URL(request.url);
   
-  // Allow static assets and auth endpoint
-  if (!url.pathname.startsWith('/api/') || url.pathname === '/api/auth') {
-    return context.next();
+  // Skip auth for public endpoints
+  if (PUBLIC_PATHS.includes(url.pathname)) {
+    return next();
   }
   
-  // Check for authentication
-  const authHeader = request.headers.get('Authorization');
-  const sessionCookie = getCookie(request, 'tuneforge-session');
+  // Skip auth for static assets
+  if (!url.pathname.startsWith('/api/')) {
+    return next();
+  }
   
-  if (!authHeader && !sessionCookie) {
-    return new Response(JSON.stringify({ error: 'Authentication required' }), { 
+  // Get session from cookie
+  const cookie = request.headers.get('Cookie');
+  const sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+  
+  if (!sessionToken) {
+    return new Response(JSON.stringify({ 
+      error: "Authentication required",
+      code: "NO_SESSION"
+    }), { 
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
   }
   
-  // Validate Basic Auth
-  if (authHeader) {
-    const [scheme, encoded] = authHeader.split(' ');
-    if (scheme !== 'Basic') {
-      return new Response('Unauthorized', { status: 401 });
-    }
-    
-    const decoded = atob(encoded);
-    const [username, password] = decoded.split(':');
-    
-    if (password !== env.AUTH_PASSWORD) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-    
-    // Set session cookie for future requests
-    const response = await context.next();
-    response.headers.set('Set-Cookie', `tuneforge-session=${btoa(password)}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=86400`);
-    return response;
+  // Verify session (no expiry check needed)
+  const session = await env.SESSIONS.get(`session:${sessionToken}`, 'json');
+  if (!session) {
+    return new Response(JSON.stringify({ 
+      error: "Invalid session",
+      code: "INVALID_SESSION"
+    }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
   
-  // Validate session cookie
-  if (sessionCookie) {
-    try {
-      const password = atob(sessionCookie);
-      if (password !== env.AUTH_PASSWORD) {
-        return new Response('Unauthorized', { status: 401 });
-      }
-    } catch (e) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+  // Get user details
+  const user = await env.USERS.get(`user:${session.email}`, 'json');
+  if (!user) {
+    return new Response(JSON.stringify({ 
+      error: "User not found",
+      code: "USER_NOT_FOUND"
+    }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
   
-  return context.next();
-}
-
-function getCookie(request, name) {
-  const cookieHeader = request.headers.get('Cookie');
-  if (!cookieHeader) return null;
+  // Add user context to request for use in API endpoints
+  context.user = {
+    ...session,
+    ...user,
+    sessionToken
+  };
   
-  const cookies = cookieHeader.split(';').map(c => c.trim());
-  for (const cookie of cookies) {
-    const [key, value] = cookie.split('=');
-    if (key === name) return value;
-  }
-  return null;
+  // Log access for monitoring
+  console.log(`[Access] ${session.email} -> ${request.method} ${url.pathname}`);
+  
+  return next();
 }
