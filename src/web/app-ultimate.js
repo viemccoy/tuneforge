@@ -160,8 +160,9 @@ class TuneForgeUltimate {
         }
         
         try {
-            // First, check if password creation is needed
-            if (!passwordInput.style.display || passwordInput.style.display === 'none') {
+            // First, check if password fields are hidden
+            const passwordFieldsDiv = document.getElementById('passwordFields');
+            if (!passwordFieldsDiv.style.display || passwordFieldsDiv.style.display === 'none') {
                 const checkResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -172,14 +173,17 @@ class TuneForgeUltimate {
                 
                 if (checkData.requiresPassword) {
                     // Show password creation fields
+                    passwordFieldsDiv.style.display = 'block';
                     passwordInput.style.display = 'block';
                     passwordConfirmInput.style.display = 'block';
+                    document.getElementById('confirmLabel').style.display = 'block';
                     passwordInput.focus();
                     messageEl.textContent = checkData.message || 'Create your password';
                     errorEl.textContent = '';
                     return;
                 } else if (!checkResponse.ok) {
-                    // Not a morpheus.systems email
+                    // Not a morpheus.systems email or user exists
+                    passwordFieldsDiv.style.display = 'block';
                     passwordInput.style.display = 'block';
                     passwordInput.focus();
                     messageEl.textContent = 'Enter your password';
@@ -233,6 +237,7 @@ class TuneForgeUltimate {
                 if (loginData.requiresPassword) {
                     // First login, need to create password
                     passwordConfirmInput.style.display = 'block';
+                    document.getElementById('confirmLabel').style.display = 'block';
                     messageEl.textContent = loginData.message || 'Create your password';
                     errorEl.textContent = '';
                     passwordInput.value = '';

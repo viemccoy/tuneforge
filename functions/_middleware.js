@@ -60,8 +60,8 @@ export async function onRequest(context) {
   
   // Add user context to request for use in API endpoints
   context.user = {
-    ...session,
     ...user,
+    ...session,
     sessionToken
   };
   

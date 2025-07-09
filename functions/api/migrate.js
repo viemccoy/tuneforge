@@ -4,10 +4,18 @@
 export async function onRequestPost(context) {
   const { request, env, user } = context;
   
+  console.log('[Migration] User context:', user);
+  console.log('[Migration] User email:', user?.email);
+  
   // Only allow vie@morpheus.systems to run migration
   if (!user || user.email !== 'vie@morpheus.systems') {
     return new Response(JSON.stringify({ 
-      error: 'Access denied. Only vie@morpheus.systems can run migration.' 
+      error: 'Access denied. Only vie@morpheus.systems can run migration.',
+      debug: {
+        hasUser: !!user,
+        userEmail: user?.email,
+        userId: user?.userId
+      }
     }), { 
       status: 403,
       headers: { 'Content-Type': 'application/json' }

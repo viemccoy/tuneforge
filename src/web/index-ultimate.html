@@ -16,10 +16,15 @@
             <div class="modal-content auth-modal">
                 <h2>TUNEFORGE ACCESS</h2>
                 <div class="auth-form">
-                    <input type="email" id="authEmail" placeholder="email@domain.com" class="auth-input" required>
-                    <input type="password" id="authPassword" placeholder="password" class="auth-input" style="display: none;">
-                    <input type="password" id="authPasswordConfirm" placeholder="confirm password" class="auth-input" style="display: none;">
-                    <button id="authSubmit" class="btn btn-primary">AUTHENTICATE</button>
+                    <label class="auth-label">EMAIL ADDRESS</label>
+                    <input type="email" id="authEmail" placeholder="your@email.com" class="auth-input" required autofocus>
+                    <div id="passwordFields" style="display: none;">
+                        <label class="auth-label">PASSWORD</label>
+                        <input type="password" id="authPassword" placeholder="enter password" class="auth-input">
+                        <label class="auth-label" id="confirmLabel" style="display: none;">CONFIRM PASSWORD</label>
+                        <input type="password" id="authPasswordConfirm" placeholder="confirm password" class="auth-input" style="display: none;">
+                    </div>
+                    <button id="authSubmit" class="btn btn-primary">CONTINUE</button>
                     <div id="authMessage" class="auth-message"></div>
                     <div id="authError" class="error-message"></div>
                 </div>
