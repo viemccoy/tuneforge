@@ -222,6 +222,14 @@ export async function onRequestPost(context) {
       // Create session
       const session = await createSession(env, user);
       
+      const headers = new Headers({
+        'Content-Type': 'application/json'
+      });
+      
+      // Cloudflare requires append for Set-Cookie headers
+      // Try simpler cookie format first
+      headers.append('Set-Cookie', `session=${session.token}; Path=/; SameSite=Lax`);
+      
       return new Response(JSON.stringify({ 
         success: true,
         session: session.token,
@@ -231,9 +239,7 @@ export async function onRequestPost(context) {
           role: user.role
         }
       }), {
-        headers: {
-          'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`
-        }
+        headers: headers
       });
     }
     
@@ -260,9 +266,13 @@ export async function onRequestDelete(context) {
     await env.SESSIONS.delete(`session:${sessionToken}`);
   }
   
+  const headers = new Headers({
+    'Content-Type': 'application/json'
+  });
+  
+  headers.append('Set-Cookie', 'session=; Path=/; SameSite=Lax; Max-Age=0');
+  
   return new Response(JSON.stringify({ success: true }), {
-    headers: {
-      'Set-Cookie': 'session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
-    }
+    headers: headers
   });
 }

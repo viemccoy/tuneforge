@@ -171,6 +171,14 @@ export async function onRequestPost(context) {
     // Create persistent session
     const session = await createSession(env, user);
     
+    const headers = new Headers({
+      'Content-Type': 'application/json'
+    });
+    
+    // Cloudflare requires append for Set-Cookie headers
+    // Try simpler cookie format first
+    headers.append('Set-Cookie', `session=${session.token}; Path=/; SameSite=Lax`);
+    
     const response = new Response(JSON.stringify({ 
       success: true,
       user: { 
@@ -179,10 +187,7 @@ export async function onRequestPost(context) {
         role: user.role 
       }
     }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`
-      }
+      headers: headers
     });
     
     console.log('[Auth] Sending response with Set-Cookie header:', `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`);
