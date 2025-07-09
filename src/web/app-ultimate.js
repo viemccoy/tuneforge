@@ -84,15 +84,34 @@ class TuneForgeUltimate {
         }
         
         // Auth form handlers
-        document.getElementById('authSubmit').addEventListener('click', () => this.authenticate());
-        document.getElementById('authEmail').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.authenticate();
+        const authSubmitBtn = document.getElementById('authSubmit');
+        if (authSubmitBtn) {
+            authSubmitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Continue button clicked');
+                this.authenticate();
+            });
+        } else {
+            console.error('authSubmit button not found!');
+        }
+        
+        document.getElementById('authEmail')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.authenticate();
+            }
         });
-        document.getElementById('authPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.authenticate();
+        document.getElementById('authPassword')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.authenticate();
+            }
         });
-        document.getElementById('authPasswordConfirm').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.authenticate();
+        document.getElementById('authPasswordConfirm')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.authenticate();
+            }
         });
         document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
     }
@@ -149,71 +168,77 @@ class TuneForgeUltimate {
         const passwordConfirmInput = document.getElementById('authPasswordConfirm');
         const errorEl = document.getElementById('authError');
         const messageEl = document.getElementById('authMessage');
-        
+        const passwordFieldsDiv = document.getElementById('passwordFields');
+        const authSubmitBtn = document.getElementById('authSubmit');
+
         const email = emailInput.value.trim();
         const password = passwordInput.value;
         const passwordConfirm = passwordConfirmInput.value;
-        
+
         if (!email) {
             errorEl.textContent = 'Email required';
             return;
         }
-        
+
         try {
-            // First, check if password fields are hidden
-            const passwordFieldsDiv = document.getElementById('passwordFields');
-            if (!passwordFieldsDiv.style.display || passwordFieldsDiv.style.display === 'none') {
+            // State 1: Password fields are not yet visible. This is the first click.
+            if (passwordFieldsDiv.style.display === 'none') {
                 const checkResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
-                
+
                 const checkData = await checkResponse.json();
-                
-                if (checkData.requiresPassword) {
-                    // Show password creation fields
-                    passwordFieldsDiv.style.display = 'block';
-                    passwordInput.style.display = 'block';
-                    passwordConfirmInput.style.display = 'block';
-                    document.getElementById('confirmLabel').style.display = 'block';
-                    passwordInput.focus();
-                    messageEl.textContent = checkData.message || 'Create your password';
-                    errorEl.textContent = '';
-                    return;
-                } else if (!checkResponse.ok) {
-                    // Not a morpheus.systems email or user exists
-                    passwordFieldsDiv.style.display = 'block';
-                    passwordInput.style.display = 'block';
-                    passwordInput.focus();
-                    messageEl.textContent = 'Enter your password';
-                    errorEl.textContent = '';
+
+                if (!checkResponse.ok) {
+                    errorEl.textContent = checkData.error || 'Invalid email address.';
                     return;
                 }
+
+                // Show the password fields container
+                passwordFieldsDiv.style.display = 'block';
+                passwordInput.style.display = 'block';
+                passwordInput.focus();
+
+                if (checkData.requiresPassword) {
+                    // Case: New user or first-time login for existing user.
+                    passwordConfirmInput.style.display = 'block';
+                    document.getElementById('confirmLabel').style.display = 'block';
+                    messageEl.textContent = checkData.message || 'Create your password';
+                    authSubmitBtn.textContent = 'CREATE PASSWORD';
+                } else {
+                    // Case: Existing user with a password.
+                    messageEl.textContent = checkData.message || 'Enter your password';
+                    authSubmitBtn.textContent = 'LOGIN';
+                }
+                errorEl.textContent = '';
+                return; // Wait for the user to enter password info.
             }
-            
-            // If we have a password confirm field visible, this is password creation
-            if (passwordConfirmInput.style.display === 'block' && passwordConfirm) {
+
+            // State 2: Password fields are visible. This is the second click.
+            // We are either creating a password or logging in.
+
+            if (passwordConfirmInput.style.display === 'block') {
+                // Action: Create Password
                 if (password !== passwordConfirm) {
                     errorEl.textContent = 'Passwords do not match';
                     return;
                 }
-                
                 if (password.length < 8) {
                     errorEl.textContent = 'Password must be at least 8 characters';
                     return;
                 }
-                
-                // Create password
+
                 const createResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ email, password, passwordConfirm })
                 });
-                
+
                 const createData = await createResponse.json();
-                
+
                 if (createData.success) {
                     this.currentUser = createData.user;
                     this.authenticated = true;
@@ -223,23 +248,37 @@ class TuneForgeUltimate {
                 } else {
                     errorEl.textContent = createData.error || 'Password creation failed';
                 }
-            } else if (password) {
-                // Normal login
+            } else {
+                // Action: Login
+                if (!password) {
+                    errorEl.textContent = 'Password required';
+                    return;
+                }
+
                 const loginResponse = await fetch(`${this.apiBase}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ email, password })
                 });
-                
+
                 const loginData = await loginResponse.json();
-                
-                if (loginData.requiresPassword) {
-                    // First login, need to create password
-                    passwordConfirmInput.style.display = 'block';
-                    document.getElementById('confirmLabel').style.display = 'block';
-                    messageEl.textContent = loginData.message || 'Create your password';
-                    errorEl.textContent = '';
+
+                if (loginData.success) {
+                    this.currentUser = loginData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(loginData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = loginData.error || 'Invalid credentials';
+                    passwordInput.value = '';
+                }
+            }
+        } catch (error) {
+            console.error('Auth error:', error);
+            errorEl.textContent = 'Authentication failed. Please try again.';
+        }
                     passwordInput.value = '';
                     passwordInput.focus();
                 } else if (loginData.success) {
