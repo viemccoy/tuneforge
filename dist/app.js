@@ -385,8 +385,14 @@ class TuneForgeUltimate {
             document.getElementById('connectionDot').classList.add('connected');
         }
         
-        // Load initial data
-        await this.loadBins();
+        // Load initial data - don't let this block the UI
+        try {
+            await this.loadBins();
+        } catch (error) {
+            console.error('Failed to load bins on init:', error);
+            // Show empty state but let user continue
+            this.showMessage('Unable to load bins. You can still create a new bin.', 'warning');
+        }
         await this.loadModels();
         await this.loadSavedPrompts();
         
