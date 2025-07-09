@@ -1,5 +1,44 @@
 // Email/password authentication endpoint
-import { verify } from '@node-rs/argon2';
+
+// Web Crypto API password verification
+async function verifyPassword(storedHash, password) {
+  const [saltBase64, hashBase64] = storedHash.split(':');
+  const salt = new Uint8Array(atob(saltBase64).split('').map(c => c.charCodeAt(0)));
+  const storedHashArray = new Uint8Array(atob(hashBase64).split('').map(c => c.charCodeAt(0)));
+  
+  const encoder = new TextEncoder();
+  
+  // Derive key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  // Derive bits using same parameters
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  
+  // Compare hashes
+  const testHashArray = new Uint8Array(derivedBits);
+  if (testHashArray.length !== storedHashArray.length) return false;
+  
+  for (let i = 0; i < testHashArray.length; i++) {
+    if (testHashArray[i] !== storedHashArray[i]) return false;
+  }
+  
+  return true;
+}
 
 // Helper to create a secure session
 async function createSession(env, user) {
@@ -107,11 +146,7 @@ export async function onRequestPost(context) {
       }), { status: 400 });
     }
     
-    const valid = await verify(user.passwordHash, password, {
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 1,
-    });
+    const valid = await verifyPassword(user.passwordHash, password);
     
     if (!valid) {
       return new Response(JSON.stringify({ 

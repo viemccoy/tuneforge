@@ -1,5 +1,78 @@
 // User registration and password management
-import { hash, verify } from '@node-rs/argon2';
+
+// Web Crypto API password hashing
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  // Derive key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  // Derive bits using PBKDF2
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  
+  // Convert to base64 for storage
+  const hashArray = new Uint8Array(derivedBits);
+  const hashBase64 = btoa(String.fromCharCode(...hashArray));
+  const saltBase64 = btoa(String.fromCharCode(...salt));
+  
+  // Return salt and hash combined
+  return `${saltBase64}:${hashBase64}`;
+}
+
+async function verifyPassword(storedHash, password) {
+  const [saltBase64, hashBase64] = storedHash.split(':');
+  const salt = new Uint8Array(atob(saltBase64).split('').map(c => c.charCodeAt(0)));
+  const storedHashArray = new Uint8Array(atob(hashBase64).split('').map(c => c.charCodeAt(0)));
+  
+  const encoder = new TextEncoder();
+  
+  // Derive key from password
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  // Derive bits using same parameters
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  
+  // Compare hashes
+  const testHashArray = new Uint8Array(derivedBits);
+  if (testHashArray.length !== storedHashArray.length) return false;
+  
+  for (let i = 0; i < testHashArray.length; i++) {
+    if (testHashArray[i] !== storedHashArray[i]) return false;
+  }
+  
+  return true;
+}
 
 // Helper to create a secure session
 async function createSession(env, user) {
@@ -129,12 +202,8 @@ export async function onRequestPost(context) {
         }), { status: 404 });
       }
       
-      // Hash password using argon2
-      const passwordHash = await hash(password, {
-        memoryCost: 65536,
-        timeCost: 3,
-        parallelism: 1,
-      });
+      // Hash password using Web Crypto API
+      const passwordHash = await hashPassword(password);
       
       // Update user with password
       user.passwordHash = passwordHash;
