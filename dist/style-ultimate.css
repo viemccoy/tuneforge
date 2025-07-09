@@ -49,6 +49,26 @@
     font-family: 'Courier New', monospace;
 }
 
+.auth-label {
+    display: block;
+    color: var(--matrix-green-bright);
+    font-size: 0.85em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    font-family: 'Courier New', monospace;
+}
+
+.auth-form {
+    text-align: left;
+}
+
+.auth-form .btn-primary {
+    width: 100%;
+    margin-top: 1rem;
+}
+
 /* Layout adjustments for bin-aware interface */
 .main-content {
     grid-template-columns: 350px 1fr 280px;
