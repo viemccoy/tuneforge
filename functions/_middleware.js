@@ -63,24 +63,32 @@ export async function onRequest(context) {
   
   // Get user details
   console.log('[Middleware] Session email:', session.email);
+  console.log('[Middleware] Session full structure:', JSON.stringify(session));
   const user = await env.USERS.get(`user:${session.email}`, 'json');
   console.log('[Middleware] User lookup result:', user ? 'found' : 'not found');
   if (!user) {
     return new Response(JSON.stringify({ 
       error: "User not found",
-      code: "USER_NOT_FOUND"
+      code: "USER_NOT_FOUND",
+      debug: {
+        sessionEmail: session.email,
+        lookupKey: `user:${session.email}`
+      }
     }), { 
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
   }
   
-  // Add user context to request for use in API endpoints
-  context.user = {
-    ...user,
-    ...session,
-    sessionToken
-  };
+  // Add user to context for use in API endpoints
+  // Endpoints expect context.user directly
+  context.user = user;
+  context.session = session;
+  
+  // Also add to context.data for backwards compatibility
+  context.data = context.data || {};
+  context.data.user = user;
+  context.data.session = session;
   
   // Log access for monitoring
   console.log(`[Access] ${session.email} -> ${request.method} ${url.pathname}`);
