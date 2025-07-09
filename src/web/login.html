@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneForge Access Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-ultimate.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+        
+        /* Matrix rain background */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.1;
+            z-index: 0;
+        }
+        
+        .login-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+        }
+        
+        .login-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 3rem 2rem;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 65, 0.1),
+                0 0 40px rgba(0, 255, 65, 0.05),
+                inset 0 0 20px rgba(0, 255, 65, 0.02);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .login-box::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, 
+                var(--matrix-green), 
+                transparent, 
+                var(--matrix-green-bright), 
+                transparent, 
+                var(--matrix-green));
+            opacity: 0;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+            animation: borderRotate 3s linear infinite;
+        }
+        
+        @keyframes borderRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .login-box:hover::before {
+            opacity: 0.3;
+        }
+        
+        .login-title {
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--matrix-green-bright);
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 0.1em;
+        }
+        
+        .login-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+        
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .auth-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .auth-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+        }
+        
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--matrix-green);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+        
+        .auth-input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+        
+        #authSubmit {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--matrix-green);
+            color: var(--bg-primary);
+            border: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+        
+        #authSubmit:hover:not(:disabled) {
+            background: var(--matrix-green-bright);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            transform: translateY(-1px);
+        }
+        
+        #authSubmit:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        
+        #authSubmit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .auth-message {
+            text-align: center;
+            color: var(--matrix-green);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        
+        .error-message {
+            text-align: center;
+            color: var(--error);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 0.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Glitch effect for title */
+        @keyframes glitch {
+            0%, 100% { text-shadow: 0 0 10px var(--matrix-green); }
+            25% { text-shadow: -2px 0 10px var(--error), 2px 0 10px var(--matrix-green-bright); }
+            50% { text-shadow: 2px 0 10px var(--error), -2px 0 10px var(--matrix-green-bright); }
+            75% { text-shadow: 0 0 20px var(--matrix-green); }
+        }
+        
+        .login-title:hover {
+            animation: glitch 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <canvas class="matrix-bg" id="matrix"></canvas>
+    
+    <div class="login-container">
+        <div class="login-box">
+            <h1 class="login-title">TUNEFORGE</h1>
+            <p class="login-subtitle">AUTHENTICATION REQUIRED</p>
+            
+            <form class="auth-form" id="authForm">
+                <div>
+                    <label class="auth-label">EMAIL ADDRESS</label>
+                    <input type="email" id="authEmail" placeholder="your@email.com" class="auth-input" required autofocus>
+                </div>
+                
+                <div id="passwordFields" style="display: none;">
+                    <div>
+                        <label class="auth-label">PASSWORD</label>
+                        <input type="password" id="authPassword" placeholder="enter password" class="auth-input">
+                    </div>
+                    <div id="confirmContainer" style="display: none;">
+                        <label class="auth-label">CONFIRM PASSWORD</label>
+                        <input type="password" id="authPasswordConfirm" placeholder="confirm password" class="auth-input">
+                    </div>
+                </div>
+                
+                <button type="submit" id="authSubmit" class="btn btn-primary">CONTINUE</button>
+                
+                <div id="authMessage" class="auth-message"></div>
+                <div id="authError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Matrix rain effect
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
+        const matrixArray = matrix.split("");
+        
+        const fontSize = 10;
+        const columns = canvas.width / fontSize;
+        
+        const drops = [];
+        for(let x = 0; x < columns; x++) {
+            drops[x] = 1;
+        }
+        
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#00ff41';
+            ctx.font = fontSize + 'px monospace';
+            
+            for(let i = 0; i < drops.length; i++) {
+                const text = matrixArray[Math.floor(Math.random() * matrixArray.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        setInterval(draw, 35);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+    
+    <script src="login.js"></script>
+</body>
+</html>

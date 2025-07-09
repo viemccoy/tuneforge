@@ -58,88 +58,51 @@ class TuneForgeUltimate {
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
-        this.initializeAuth();
+        this.checkAuth();
     }
     
-    async initializeAuth() {
-        console.log('initializeAuth() called');
-        // Store user info
-        this.currentUser = null;
+    async checkAuth() {
+        console.log('checkAuth() called');
         
         if (this.isCloudflare) {
-            // Don't check authentication by fetching bins - just show auth modal
-            // The session will be checked when the user actually logs in
-            this.showAuthModal();
-            // Set up auth handlers after showing modal
-            setTimeout(() => this.setupAuthHandlers(), 100);
+            // Check if we have a session token
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            
+            if (!sessionToken) {
+                // No token, redirect to login
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // Verify token is valid by trying to fetch bins
+            try {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
+                
+                if (!response.ok) {
+                    // Invalid token, redirect to login
+                    sessionStorage.removeItem('tuneforge_session');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                // Valid session, proceed
+                this.authenticated = true;
+                this.initialize();
+                
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                sessionStorage.removeItem('tuneforge_session');
+                window.location.href = '/login.html';
+            }
         } else {
             // Socket.io mode - no auth needed
             this.authenticated = true;
-            this.hideAuthModal();
             this.initialize();
         }
     }
     
-    setupAuthHandlers() {
-        console.log('Setting up auth handlers');
-        
-        // More robust button setup
-        const setupButton = () => {
-            const authSubmitBtn = document.getElementById('authSubmit');
-            if (!authSubmitBtn) {
-                console.error('authSubmit button not found! Retrying...');
-                setTimeout(setupButton, 100);
-                return;
-            }
-            
-            console.log('Found authSubmit button, adding handlers');
-            
-            // Clear any existing handlers by cloning
-            const newBtn = authSubmitBtn.cloneNode(true);
-            authSubmitBtn.parentNode.replaceChild(newBtn, authSubmitBtn);
-            
-            // Add multiple handler types
-            newBtn.onclick = (e) => {
-                console.log('onclick handler fired');
-                e.preventDefault();
-                e.stopPropagation();
-                this.authenticate();
-            };
-            
-            newBtn.addEventListener('click', (e) => {
-                console.log('addEventListener handler fired');
-                e.preventDefault();
-                e.stopPropagation();
-                this.authenticate();
-            }, true);
-            
-            // Make sure button is not disabled
-            newBtn.disabled = false;
-            newBtn.style.pointerEvents = 'auto';
-            newBtn.style.cursor = 'pointer';
-        };
-        
-        setupButton();
-        
-        // Setup enter key handling for all auth fields
-        const authFields = ['authEmail', 'authPassword', 'authPasswordConfirm'];
-        authFields.forEach(fieldId => {
-            const field = document.getElementById(fieldId);
-            if (field) {
-                console.log(`Setting up enter handler for ${fieldId}`);
-                // Use keydown instead of keypress for better compatibility
-                field.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        console.log(`Enter pressed in ${fieldId}`);
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.authenticate();
-                    }
-                });
-            }
-        });
-        
-        
+    // Add logout button handler
+    setupLogoutHandler() {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
@@ -192,18 +155,21 @@ class TuneForgeUltimate {
     }
     
     handleAuthError() {
-        // Only show auth modal once
+        // Redirect to login page
         if (!this.authErrorHandled) {
             this.authErrorHandled = true;
             this.showNotification('Authentication required. Please log in again.', 'error');
             setTimeout(() => {
-                this.showAuthModal();
+                window.location.href = '/login.html';
             }, 1000);
         }
     }
     
+    // Authentication is now handled by login.html page
     async authenticate() {
-        console.log('authenticate() called');
+        // Redirect to login page
+        window.location.href = '/login.html';
+        return;
         const emailInput = document.getElementById('authEmail');
         const passwordInput = document.getElementById('authPassword');
         const passwordConfirmInput = document.getElementById('authPasswordConfirm');
@@ -385,19 +351,8 @@ class TuneForgeUltimate {
             console.error('Logout error:', error);
         }
         
-        // Clear local state and reload
-        this.authenticated = false;
-        this.currentUser = null;
-        window.location.reload();
-    }
-    
-    showAuthModal() {
-        document.getElementById('authModal').classList.add('active');
-        document.getElementById('authEmail').focus();
-    }
-    
-    hideAuthModal() {
-        document.getElementById('authModal').classList.remove('active');
+        // Redirect to login page
+        window.location.href = '/login.html';
     }
     
     async initialize() {
@@ -409,6 +364,7 @@ class TuneForgeUltimate {
         // Setup event listeners
         this.initializeEventListeners();
         this.setupKeyboardShortcuts();
+        this.setupLogoutHandler();
         
         // Initialize connection
         if (!this.isCloudflare) {
@@ -3721,27 +3677,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Also set up a global click handler as a fallback
-document.addEventListener('click', (e) => {
-    if (e.target.id === 'authSubmit') {
-        console.log('Auth submit clicked via global handler');
-        e.preventDefault();
-        if (window.tuneforge) {
-            window.tuneforge.authenticate();
-        }
-    }
-});
-
-// Global keypress handler for auth fields
-document.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const authFields = ['authEmail', 'authPassword', 'authPasswordConfirm'];
-        if (authFields.includes(e.target.id)) {
-            console.log('Enter pressed in auth field via global handler');
-            e.preventDefault();
-            if (window.tuneforge) {
-                window.tuneforge.authenticate();
-            }
-        }
-    }
-});

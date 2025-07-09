@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Force Login</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            background: #000; 
+            color: #0f0; 
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        input { 
+            background: #111; 
+            color: #0f0; 
+            border: 1px solid #0f0; 
+            padding: 10px; 
+            width: 100%;
+            margin: 10px 0;
+        }
+        button { 
+            background: #0f0; 
+            color: #000; 
+            border: none; 
+            padding: 10px 20px; 
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+    </style>
+</head>
+<body>
+    <h1>TuneForge Direct Login</h1>
+    
+    <div>
+        <input type="email" id="email" placeholder="Email" value="vie@morpheus.systems" />
+        <input type="password" id="password" placeholder="Password" />
+        <button onclick="doLogin()">LOGIN</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function doLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const status = document.getElementById('status');
+            
+            if (!email || !password) {
+                status.innerHTML = '<p class="error">Please enter email and password</p>';
+                return;
+            }
+            
+            status.innerHTML = '<p>Logging in...</p>';
+            
+            try {
+                // Step 1: Check user
+                const checkResponse = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const checkData = await checkResponse.json();
+                console.log('User check:', checkData);
+                
+                // Step 2: Login
+                const loginResponse = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const loginData = await loginResponse.json();
+                console.log('Login response:', loginData);
+                
+                if (loginData.success && loginData.session) {
+                    // Store session
+                    sessionStorage.setItem('tuneforge_session', loginData.session);
+                    
+                    status.innerHTML = '<p class="success">Login successful! Redirecting...</p>';
+                    
+                    // Redirect to main app
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    status.innerHTML = `<p class="error">Login failed: ${loginData.error || 'Unknown error'}</p>`;
+                }
+                
+            } catch (error) {
+                status.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Allow Enter key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                doLogin();
+            }
+        });
+    </script>
+</body>
+</html>

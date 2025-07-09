@@ -18,6 +18,8 @@ const staticFiles = [
   'src/web/index-ultimate.html',
   'src/web/app-ultimate.js',
   'src/web/loom.js',
+  'src/web/login.html',
+  'src/web/login.js',
   'src/web/style.css',
   'src/web/style-bins.css',
   'src/web/style-final.css',
