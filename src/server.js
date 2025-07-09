@@ -74,6 +74,32 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('get-models', () => {
+    socket.emit('models', modelManager.getAvailableModels());
+  });
+
+  socket.on('generate', async (data) => {
+    try {
+      const { systemPrompt, messages, models, temperature, maxTokens } = data;
+      
+      console.log('Generate request received:', { models, messageCount: messages.length });
+      
+      // Generate responses with the full message history
+      const responses = await modelManager.generateMultipleResponsesWithHistory(
+        [...messages, { role: 'system', content: systemPrompt }],
+        models,
+        { temperature, maxTokens }
+      );
+      
+      socket.emit('responses', {
+        responses
+      });
+    } catch (error) {
+      console.error('Generation error:', error);
+      socket.emit('error', { message: error.message });
+    }
+  });
+
   socket.on('generate-personas', (seedPrompt) => {
     try {
       const variations = personaGenerator.generatePromptVariations(seedPrompt, 5);
