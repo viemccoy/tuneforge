@@ -41,20 +41,29 @@ export async function onRequestGet(context) {
     
     const { user } = auth;
     
-    // List all bins for the user's team
-    const { keys } = await env.BINS.list({ prefix: `bin:${user.teamId}:` });
+    // List all bins in the namespace
+    const { keys } = await env.BINS.list();
     
-    const bins = await Promise.all(
-      keys.map(async (key) => {
-        const bin = await env.BINS.get(key.name, 'json');
-        return bin;
-      })
-    );
+    const userBins = [];
     
-    const validBins = bins.filter(bin => bin !== null);
+    // Check each bin to see if user has access
+    for (const key of keys) {
+      const bin = await env.BINS.get(key.name, 'json');
+      if (bin) {
+        // Include bin if:
+        // 1. It belongs to user's team
+        // 2. It has no team (orphaned) and was created by user
+        // 3. It's an old bin without team assignment
+        if (bin.teamId === user.teamId || 
+            (!bin.teamId && bin.createdBy === user.email) ||
+            (!bin.teamId && !bin.createdBy)) {
+          userBins.push(bin);
+        }
+      }
+    }
     
     return new Response(JSON.stringify({ 
-      bins: validBins,
+      bins: userBins,
       teamId: user.teamId 
     }), {
       headers: { 'Content-Type': 'application/json' }

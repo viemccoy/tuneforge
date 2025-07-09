@@ -2311,8 +2311,8 @@ class TuneForgeUltimate {
         if (this.isCloudflare) {
             try {
                 const endpoint = isNewConversation 
-                    ? `${this.apiBase}/conversations`
-                    : `${this.apiBase}/conversations/${conversationId}`;
+                    ? `${this.apiBase}/conversations-fixed`
+                    : `${this.apiBase}/conversations-fixed/${conversationId}`;
                     
                 const response = await this.fetchWithAuth(endpoint, {
                     method: isNewConversation ? 'POST' : 'PUT',
@@ -2480,7 +2480,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations-fixed/${this.currentConversationId}?binId=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 

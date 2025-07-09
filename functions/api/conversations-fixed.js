@@ -58,14 +58,40 @@ export async function onRequestGet(context) {
       bin = await env.BINS.get(binId, 'json');
     }
     
-    if (!bin || (bin.teamId && bin.teamId !== user.teamId)) {
+    // If still not found, scan all bins to find it (recovery mode)
+    if (!bin) {
+      const { keys } = await env.BINS.list();
+      for (const key of keys) {
+        const testBin = await env.BINS.get(key.name, 'json');
+        if (testBin && testBin.id === binId) {
+          bin = testBin;
+          console.log(`Found bin ${binId} with key ${key.name}`);
+          break;
+        }
+      }
+    }
+    
+    if (!bin) {
+      return new Response(JSON.stringify({ 
+        error: 'Bin not found',
+        debug: {
+          binId,
+          userTeam: user.teamId,
+          message: 'Bin might have been migrated. Use /api/recover-bins to find it.'
+        }
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (bin.teamId && bin.teamId !== user.teamId) {
       return new Response(JSON.stringify({ 
         error: 'Access denied',
         debug: {
           binId,
           userTeam: user.teamId,
-          binTeam: bin?.teamId,
-          binFound: !!bin
+          binTeam: bin.teamId
         }
       }), {
         status: 403,
@@ -162,11 +188,20 @@ export async function onRequestPost(context) {
       bin.conversationCount = (bin.conversationCount || 0) + 1;
       bin.lastUpdated = new Date().toISOString();
       
-      // Save with proper key format
-      if (bin.teamId) {
-        await env.BINS.put(`bin:${user.teamId}:${binId}`, JSON.stringify(bin));
-      } else {
-        await env.BINS.put(binId, JSON.stringify(bin));
+      // If bin has no team, assign it to user's team (recovery)
+      if (!bin.teamId) {
+        bin.teamId = user.teamId;
+        bin.recoveredAt = new Date().toISOString();
+        console.log(`Recovering orphaned bin ${bin.id} for team ${user.teamId}`);
+      }
+      
+      // Always save with new key format
+      const correctKey = `bin:${user.teamId}:${binId}`;
+      await env.BINS.put(correctKey, JSON.stringify(bin));
+      
+      // Clean up old key if it exists
+      if (!bin.teamId) {
+        await env.BINS.delete(binId);
       }
     }
     
