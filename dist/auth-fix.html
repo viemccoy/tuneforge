@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Fix Test</title>
+    <script>
+        // Temporary fix - inject into page after load
+        window.addEventListener('load', () => {
+            console.log('Applying auth fix...');
+            
+            // Fix 1: Make sure button is clickable
+            const fixButton = () => {
+                const btn = document.getElementById('authSubmit');
+                if (!btn) {
+                    console.log('Button not found, retrying...');
+                    setTimeout(fixButton, 500);
+                    return;
+                }
+                
+                console.log('Found button, fixing...');
+                
+                // Remove any existing click handlers by cloning
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                
+                // Add direct click handler
+                newBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Direct onclick fired!');
+                    if (window.tuneforge && window.tuneforge.authenticate) {
+                        window.tuneforge.authenticate();
+                    }
+                };
+                
+                // Also add addEventListener as backup
+                newBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('addEventListener fired!');
+                    if (window.tuneforge && window.tuneforge.authenticate) {
+                        window.tuneforge.authenticate();
+                    }
+                }, true); // Use capture phase
+                
+                console.log('Button fix applied');
+            };
+            
+            // Fix 2: Make sure Enter key works
+            const fixEnterKey = () => {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const activeElement = document.activeElement;
+                        if (activeElement && ['authEmail', 'authPassword', 'authPasswordConfirm'].includes(activeElement.id)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('Enter key intercepted in auth field');
+                            if (window.tuneforge && window.tuneforge.authenticate) {
+                                window.tuneforge.authenticate();
+                            }
+                        }
+                    }
+                }, true); // Use capture phase
+            };
+            
+            // Apply fixes
+            setTimeout(() => {
+                fixButton();
+                fixEnterKey();
+                console.log('All fixes applied');
+            }, 1000);
+        });
+    </script>
+</head>
+<body>
+    <h1>Loading TuneForge with auth fix...</h1>
+    <script>
+        // Redirect to main app after fixes are injected
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 2000);
+    </script>
+</body>
+</html>

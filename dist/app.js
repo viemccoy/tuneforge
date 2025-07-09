@@ -83,63 +83,62 @@ class TuneForgeUltimate {
     setupAuthHandlers() {
         console.log('Setting up auth handlers');
         
-        // Auth form handlers
-        const authSubmitBtn = document.getElementById('authSubmit');
-        if (authSubmitBtn) {
-            console.log('Found authSubmit button, adding click handler');
-            authSubmitBtn.addEventListener('click', (e) => {
+        // More robust button setup
+        const setupButton = () => {
+            const authSubmitBtn = document.getElementById('authSubmit');
+            if (!authSubmitBtn) {
+                console.error('authSubmit button not found! Retrying...');
+                setTimeout(setupButton, 100);
+                return;
+            }
+            
+            console.log('Found authSubmit button, adding handlers');
+            
+            // Clear any existing handlers by cloning
+            const newBtn = authSubmitBtn.cloneNode(true);
+            authSubmitBtn.parentNode.replaceChild(newBtn, authSubmitBtn);
+            
+            // Add multiple handler types
+            newBtn.onclick = (e) => {
+                console.log('onclick handler fired');
                 e.preventDefault();
-                console.log('Continue button clicked');
+                e.stopPropagation();
                 this.authenticate();
-            });
-        } else {
-            console.error('authSubmit button not found! Retrying...');
-            // Retry after a delay
-            setTimeout(() => {
-                const btn = document.getElementById('authSubmit');
-                if (btn) {
-                    console.log('Found authSubmit button on retry');
-                    btn.addEventListener('click', (e) => {
+            };
+            
+            newBtn.addEventListener('click', (e) => {
+                console.log('addEventListener handler fired');
+                e.preventDefault();
+                e.stopPropagation();
+                this.authenticate();
+            }, true);
+            
+            // Make sure button is not disabled
+            newBtn.disabled = false;
+            newBtn.style.pointerEvents = 'auto';
+            newBtn.style.cursor = 'pointer';
+        };
+        
+        setupButton();
+        
+        // Setup enter key handling for all auth fields
+        const authFields = ['authEmail', 'authPassword', 'authPasswordConfirm'];
+        authFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                console.log(`Setting up enter handler for ${fieldId}`);
+                // Use keydown instead of keypress for better compatibility
+                field.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        console.log(`Enter pressed in ${fieldId}`);
                         e.preventDefault();
-                        console.log('Continue button clicked');
+                        e.stopPropagation();
                         this.authenticate();
-                    });
-                }
-            }, 500);
-        }
+                    }
+                });
+            }
+        });
         
-        const emailField = document.getElementById('authEmail');
-        if (emailField) {
-            console.log('Setting up email field enter handler');
-            emailField.addEventListener('keypress', (e) => {
-                console.log('Key pressed in email field:', e.key);
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    console.log('Enter key pressed, calling authenticate()');
-                    this.authenticate();
-                }
-            });
-        }
-        
-        const passwordField = document.getElementById('authPassword');
-        if (passwordField) {
-            passwordField.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.authenticate();
-                }
-            });
-        }
-        
-        const confirmField = document.getElementById('authPasswordConfirm');
-        if (confirmField) {
-            confirmField.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.authenticate();
-                }
-            });
-        }
         
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
