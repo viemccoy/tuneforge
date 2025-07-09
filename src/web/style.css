@@ -890,6 +890,7 @@ input[type="range"]::-moz-range-thumb {
     flex: 1;
     font-size: 0.8rem;
     line-height: 1.5;
+    white-space: pre-wrap;
     color: var(--text-primary);
     overflow-y: auto;
     min-height: 350px;
