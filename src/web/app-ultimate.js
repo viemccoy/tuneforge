@@ -507,6 +507,22 @@ class TuneForgeUltimate {
         // Parameters
         document.getElementById('temperature').addEventListener('input', (e) => {
             document.getElementById('temperatureValue').textContent = e.target.value;
+            // Update bin's default temperature when changed
+            if (this.currentBin) {
+                this.updateBinSettings({ defaultTemperature: parseFloat(e.target.value) });
+            }
+        });
+        
+        // System Prompt changes
+        let systemPromptTimeout;
+        document.getElementById('systemPrompt').addEventListener('input', (e) => {
+            // Debounce system prompt updates
+            clearTimeout(systemPromptTimeout);
+            systemPromptTimeout = setTimeout(() => {
+                if (this.currentBin && e.target.value !== this.currentBin.systemPrompt) {
+                    this.updateBinSettings({ systemPrompt: e.target.value });
+                }
+            }, 1000); // Update after 1 second of no typing
         });
         
         // Token Controls
@@ -886,6 +902,12 @@ class TuneForgeUltimate {
         document.getElementById('currentBinName').textContent = bin.name;
         document.getElementById('systemPrompt').value = bin.systemPrompt;
         
+        // Load bin's default temperature if available
+        if (bin.defaultTemperature !== undefined) {
+            document.getElementById('temperature').value = bin.defaultTemperature;
+            document.getElementById('temperatureValue').textContent = bin.defaultTemperature;
+        }
+        
         // Show bin-specific UI
         document.querySelector('.app-container').classList.remove('no-bin-selected');
         document.querySelector('.app-container').classList.add('bin-selected');
@@ -979,7 +1001,8 @@ class TuneForgeUltimate {
             systemPrompt,
             description,
             createdAt: new Date().toISOString(),
-            conversationCount: 0
+            conversationCount: 0,
+            defaultTemperature: parseFloat(document.getElementById('temperature').value)
         };
         
         if (this.isCloudflare) {
@@ -1016,6 +1039,40 @@ class TuneForgeUltimate {
         document.getElementById('binName').value = '';
         document.getElementById('binSystemPrompt').value = '';
         document.getElementById('binDescription').value = '';
+    }
+    
+    async updateBinSettings(updates) {
+        if (!this.currentBin) return;
+        
+        // Update local bin object
+        Object.assign(this.currentBin, updates);
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth/${this.currentBin.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updates)
+                });
+                
+                if (response.ok) {
+                    const updatedBin = await response.json();
+                    // Update local bin with server response
+                    const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+                    if (binIndex > -1) {
+                        this.bins[binIndex] = updatedBin;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to update bin settings:', error);
+            }
+        } else {
+            // Local storage mode
+            const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+            if (binIndex > -1) {
+                this.bins[binIndex] = this.currentBin;
+                localStorage.setItem('tuneforge_bins', JSON.stringify(this.bins));
+            }
+        }
     }
     
     async deleteBin() {
@@ -1229,6 +1286,18 @@ class TuneForgeUltimate {
         this.currentConversationId = conversation.id;
         this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
         this.currentConversationDescription = conversation.description || '';
+        
+        // Extract and set system prompt from conversation
+        const systemMessage = conversation.messages.find(m => m.role === 'system');
+        if (systemMessage) {
+            document.getElementById('systemPrompt').value = systemMessage.content;
+        }
+        
+        // Load temperature from conversation metadata if available
+        if (conversation.metadata?.temperature !== undefined) {
+            document.getElementById('temperature').value = conversation.metadata.temperature;
+            document.getElementById('temperatureValue').textContent = conversation.metadata.temperature;
+        }
         
         // Load conversation into the UI
         this.currentMessages = conversation.messages.filter(m => m.role !== 'system');
@@ -2303,7 +2372,8 @@ class TuneForgeUltimate {
                 updatedAt: new Date().toISOString(),
                 turnCount: Math.floor(this.currentMessages.length / 2),
                 models: this.selectedModels,
-                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model
+                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model,
+                temperature: parseFloat(document.getElementById('temperature').value)
             }
         };
         

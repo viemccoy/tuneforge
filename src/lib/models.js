@@ -27,9 +27,9 @@ export class ModelManager {
     
     if (this.openai) {
       models.push(
-        { name: 'GPT-4.1', id: 'gpt-4.1-2025-04-14', provider: 'openai' },
-        { name: 'GPT-o3', id: 'o3-2025-04-16', provider: 'openai' },
-        { name: 'GPT-o3-pro', id: 'o3-pro-2025-04-16', provider: 'openai' }
+        { name: 'GPT-4.1', id: 'gpt-4.1', provider: 'openai' },
+        { name: 'GPT-o3', id: 'o3', provider: 'openai' },
+        { name: 'GPT-o3-pro', id: 'o3-pro', provider: 'openai' }
       );
     }
 
@@ -107,7 +107,7 @@ export class ModelManager {
       console.log(`🧠 o3 using default temperature (1.0), ignoring user setting of ${options.temperature}`);
       console.log(`🧠 o3 max_completion_tokens set to: ${requestConfig.max_completion_tokens} (accounting for reasoning)`);
       // Set reasoning effort to low to prioritize completion content over reasoning
-      requestConfig.reasoning_effort = "low"; // Available values: "low", "medium", "high"
+      requestConfig.reasoning = { effort: "low" }; // Available values: "low", "medium", "high"
     } else {
       requestConfig.max_tokens = options.maxTokens; // Standard models use max_tokens
       requestConfig.temperature = options.temperature; // Standard models support custom temperature
@@ -300,7 +300,7 @@ export class ModelManager {
       console.log(`🧠 o3 using default temperature (1.0), ignoring user setting of ${options.temperature}`);
       console.log(`🧠 o3 max_completion_tokens set to: ${requestConfig.max_completion_tokens} (accounting for reasoning)`);
       // Set reasoning effort to low to prioritize completion content over reasoning
-      requestConfig.reasoning_effort = "low"; // Available values: "low", "medium", "high"
+      requestConfig.reasoning = { effort: "low" }; // Available values: "low", "medium", "high"
     } else {
       requestConfig.max_tokens = options.maxTokens; // Standard models use max_tokens
       requestConfig.temperature = options.temperature; // Standard models support custom temperature

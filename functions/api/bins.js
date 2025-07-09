@@ -60,7 +60,7 @@ export async function onRequestPost(context) {
   }
   
   try {
-    const { systemPrompt, name, description } = await request.json();
+    const { systemPrompt, name, description, defaultTemperature } = await request.json();
     
     if (!systemPrompt || !name) {
       return new Response(JSON.stringify({ error: 'System prompt and name are required' }), {
@@ -80,6 +80,7 @@ export async function onRequestPost(context) {
       name,
       description: description || '',
       systemPrompt,
+      defaultTemperature: defaultTemperature || 0.7,
       teamId: user.teamId,
       createdBy: user.email,
       createdAt: new Date().toISOString(),
@@ -103,6 +104,83 @@ export async function onRequestPost(context) {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function onRequestPut(context) {
+  const { request, env, user } = context;
+  
+  if (!user) {
+    return new Response(JSON.stringify({ 
+      error: 'Authentication required' 
+    }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  // Check if env and BINS are available
+  if (!env || !env.BINS) {
+    return new Response(JSON.stringify({ error: 'KV namespace BINS is not available' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const binId = pathParts[pathParts.length - 1];
+  
+  if (!binId || binId === 'bins') {
+    return new Response(JSON.stringify({ error: 'Bin ID required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  try {
+    // Check if bin exists and belongs to user's team
+    const binData = await env.BINS.get(binId, 'json');
+    if (!binData) {
+      return new Response(JSON.stringify({ error: 'Bin not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (binData.teamId !== user.teamId) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Get update data
+    const updates = await request.json();
+    
+    // Update allowed fields
+    const updatedBin = {
+      ...binData,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    if (updates.name !== undefined) updatedBin.name = updates.name;
+    if (updates.description !== undefined) updatedBin.description = updates.description;
+    if (updates.systemPrompt !== undefined) updatedBin.systemPrompt = updates.systemPrompt;
+    if (updates.defaultTemperature !== undefined) updatedBin.defaultTemperature = updates.defaultTemperature;
+    
+    // Save updated bin
+    await env.BINS.put(binId, JSON.stringify(updatedBin));
+    
+    return new Response(JSON.stringify({ id: binId, ...updatedBin }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Update error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

@@ -50,6 +50,13 @@ TuneForge is a sophisticated dataset builder for AI fine-tuning with a cyberpunk
   - Also cleared in `clearConversation()` and `createNewConversation()`
   - Prevents false "select response" warnings on completed conversations
 
+- **System Prompt and Temperature Persistence**:
+  - Fixed system prompt not loading from saved conversations
+  - Added temperature persistence to conversation metadata
+  - Bins now store default temperature settings
+  - System prompt and temperature auto-save when modified
+  - Temperature and system prompt correctly load when switching conversations
+
 ### 6. Regeneration Parameter Updates
 - **Feature**: Regeneration uses current UI parameter values
 - **Implementation**:
