@@ -259,14 +259,14 @@ class TuneForgeUltimate {
                     passwordInput.style.display = 'block';
                     passwordInput.focus();
 
-                    if (checkData.requiresPassword) {
+                    if (checkData.requiresPassword === true) {
                         // Case: New user or first-time login for existing user.
                         passwordConfirmInput.style.display = 'block';
                         document.getElementById('confirmLabel').style.display = 'block';
                         messageEl.textContent = checkData.message || 'Create your password';
                         authSubmitBtn.textContent = 'CREATE PASSWORD';
                     } else {
-                        // Case: Existing user with a password.
+                        // Case: Existing user with a password (requiresPassword: false)
                         // Make sure confirm fields are hidden for login
                         passwordConfirmInput.style.display = 'none';
                         document.getElementById('confirmLabel').style.display = 'none';
