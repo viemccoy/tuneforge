@@ -694,7 +694,8 @@ class TuneForgeUltimate {
     async loadBins() {
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins`);
+                // Temporary: use bins-wrapped endpoint with built-in auth
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-wrapped`);
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
