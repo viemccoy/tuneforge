@@ -1,6 +1,9 @@
 // TuneForge Ultimate - Combining Original Power with Bin Management
+console.log('TuneForge Ultimate script loaded');
+
 class TuneForgeUltimate {
     constructor() {
+        console.log('TuneForgeUltimate constructor called');
         // Authentication
         this.authenticated = false;
         
@@ -59,6 +62,7 @@ class TuneForgeUltimate {
     }
     
     async initializeAuth() {
+        console.log('initializeAuth() called');
         // Store user info
         this.currentUser = null;
         
@@ -3713,6 +3717,13 @@ class TuneForgeUltimate {
 }
 
 // Initialize when DOM is ready
+console.log('Setting up DOMContentLoaded listener');
 document.addEventListener('DOMContentLoaded', () => {
-    window.tuneforge = new TuneForgeUltimate();
+    console.log('DOMContentLoaded fired, creating TuneForgeUltimate instance');
+    try {
+        window.tuneforge = new TuneForgeUltimate();
+        console.log('TuneForgeUltimate instance created successfully');
+    } catch (error) {
+        console.error('Error creating TuneForgeUltimate:', error);
+    }
 });
