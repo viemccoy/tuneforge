@@ -252,6 +252,20 @@ sanitizeInput(input) {
 - **Solution**: Fixed `recoverConversation()` to pass bin object instead of ID to `selectBin()`
 - **Additional Fix**: Pass `skipNewConversation=true` to prevent clearing recovered messages
 
+### 13. Removed Local Recovery System
+- **Problem**: Local recovery was interfering with bin display and causing confusion
+- **Root Cause**: Recovery dialog would restore conversation but bins wouldn't show properly
+- **Solution**: Completely removed session storage recovery system
+- **New Behavior**:
+  - Conversations save to server immediately after user sends message (if conversation exists)
+  - Conversations save to server immediately after AI response is selected
+  - No more periodic saves or recovery dialogs
+  - All data lives on server - no local backups needed
+- **Benefits**:
+  - Simpler, more reliable system
+  - No interference with bin display
+  - Data is always consistent with server state
+
 ## Migration Process
 
 To assign existing bins to the morpheus-systems team after deployment:
@@ -287,8 +301,8 @@ fetch('/api/migrate-fixed', {
 - [x] Migration tool for existing data
 - [x] Fixed endpoints with inline authentication
 - [x] Message recovery system
-- [ ] Bin selection and display
-- [ ] Conversation persistence after message weaving
+- [x] Bin selection and display (fixed with removal of local recovery)
+- [x] Conversation persistence after message weaving (saves immediately to server)
 
 ## Notes
 
