@@ -279,23 +279,6 @@ class TuneForgeUltimate {
             console.error('Auth error:', error);
             errorEl.textContent = 'Authentication failed. Please try again.';
         }
-                    passwordInput.value = '';
-                    passwordInput.focus();
-                } else if (loginData.success) {
-                    this.currentUser = loginData.user;
-                    this.authenticated = true;
-                    this.hideAuthModal();
-                    this.showUserInfo(loginData.user);
-                    this.initialize();
-                } else {
-                    errorEl.textContent = loginData.error || 'Invalid credentials';
-                    passwordInput.value = '';
-                }
-            }
-        } catch (error) {
-            console.error('Auth error:', error);
-            errorEl.textContent = 'Authentication failed';
-        }
     }
     
     showUserInfo(user) {
