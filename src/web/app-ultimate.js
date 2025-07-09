@@ -423,7 +423,7 @@ class TuneForgeUltimate {
                     userId: this.userId,
                     action: 'leave'
                 });
-                navigator.sendBeacon(`${this.apiBase}/presence`, data);
+                navigator.sendBeacon(`${this.apiBase}/presence-fixed`, data);
             }
             
             // Only warn if there's an active loom (unselected responses)
@@ -673,10 +673,12 @@ class TuneForgeUltimate {
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
-                // Hide the loading message
-                document.getElementById('binLoading').style.display = 'none';
+                // Hide the loading message if it exists
+                const binLoading = document.getElementById('binLoading');
+                if (binLoading) binLoading.style.display = 'none';
                 if (this.bins.length === 0) {
-                    document.getElementById('noBinMessage').style.display = 'block';
+                    const noBinMessage = document.getElementById('noBinMessage');
+                    if (noBinMessage) noBinMessage.style.display = 'block';
                 }
             } catch (error) {
                 console.error('Failed to load bins:', error);
@@ -696,8 +698,10 @@ class TuneForgeUltimate {
         if (this.bins.length === 0) {
             binList.innerHTML = '<div class="empty-state">No bins created yet</div>';
             // Hide the "Failed to load" message and show the "No bin selected" message
-            document.getElementById('binLoading').style.display = 'none';
-            document.getElementById('noBinMessage').style.display = 'block';
+            const binLoading = document.getElementById('binLoading');
+            if (binLoading) binLoading.style.display = 'none';
+            const noBinMessage = document.getElementById('noBinMessage');
+            if (noBinMessage) noBinMessage.style.display = 'block';
             return;
         }
         
@@ -2264,6 +2268,14 @@ class TuneForgeUltimate {
         const isNewConversation = !this.currentConversationId;
         const conversationId = this.currentConversationId || Date.now().toString();
         
+        console.log('[TuneForge] Saving conversation:', {
+            isNewConversation,
+            conversationId,
+            binId: this.currentBin.id,
+            messageCount: this.currentMessages.length,
+            autoSave
+        });
+        
         const conversation = {
             id: conversationId,
             binId: this.currentBin.id,
@@ -3384,7 +3396,7 @@ class TuneForgeUltimate {
         if (!this.isCloudflare || !this.currentConversationId || !this.currentBin) return;
         
         try {
-            await this.fetchWithAuth(`${this.apiBase}/presence`, {
+            await this.fetchWithAuth(`${this.apiBase}/presence-fixed`, {
                 method: 'POST',
                 body: JSON.stringify({
                     conversationId: this.currentConversationId,
@@ -3401,8 +3413,8 @@ class TuneForgeUltimate {
         if (!this.isCloudflare || !this.currentBin) return;
         
         try {
-            const response = await this.fetchWithAuth(`${this.apiBase}/presence?binId=${this.currentBin.id}`, {
-                method: 'OPTIONS'
+            const response = await this.fetchWithAuth(`${this.apiBase}/presence-fixed?binId=${this.currentBin.id}`, {
+                method: 'GET'
             });
             
             if (response.ok) {
