@@ -188,9 +188,12 @@ class TuneForgeUltimate {
 
         try {
             // State 1: Password fields are not yet visible. This is the first click.
-            if (passwordFieldsDiv.style.display === 'none') {
+            if (passwordFieldsDiv.style.display === 'none' || passwordFieldsDiv.style.display === '') {
                 console.log('Making request to check user:', email);
                 console.log('API base:', this.apiBase);
+                authSubmitBtn.textContent = 'CHECKING...';
+                authSubmitBtn.disabled = true;
+                
                 const checkResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -201,8 +204,11 @@ class TuneForgeUltimate {
                 const checkData = await checkResponse.json();
                 console.log('Response data:', checkData);
 
+                authSubmitBtn.disabled = false;
+
                 if (!checkResponse.ok) {
                     errorEl.textContent = checkData.error || 'Invalid email address.';
+                    authSubmitBtn.textContent = 'CONTINUE';
                     return;
                 }
 
@@ -219,6 +225,9 @@ class TuneForgeUltimate {
                     authSubmitBtn.textContent = 'CREATE PASSWORD';
                 } else {
                     // Case: Existing user with a password.
+                    // Make sure confirm fields are hidden for login
+                    passwordConfirmInput.style.display = 'none';
+                    document.getElementById('confirmLabel').style.display = 'none';
                     messageEl.textContent = checkData.message || 'Enter your password';
                     authSubmitBtn.textContent = 'LOGIN';
                 }
@@ -289,6 +298,9 @@ class TuneForgeUltimate {
             console.error('Auth error:', error);
             console.error('Error details:', error.message, error.stack);
             errorEl.textContent = error.message || 'Authentication failed. Please try again.';
+            messageEl.textContent = '';
+            authSubmitBtn.textContent = 'CONTINUE';
+            authSubmitBtn.disabled = false;
         }
     }
     
