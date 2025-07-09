@@ -96,8 +96,10 @@ class TuneForgeUltimate {
         }
         
         document.getElementById('authEmail')?.addEventListener('keypress', (e) => {
+            console.log('Key pressed in email field:', e.key);
             if (e.key === 'Enter') {
                 e.preventDefault();
+                console.log('Enter key pressed, calling authenticate()');
                 this.authenticate();
             }
         });
@@ -188,13 +190,16 @@ class TuneForgeUltimate {
             // State 1: Password fields are not yet visible. This is the first click.
             if (passwordFieldsDiv.style.display === 'none') {
                 console.log('Making request to check user:', email);
+                console.log('API base:', this.apiBase);
                 const checkResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
 
+                console.log('Response status:', checkResponse.status);
                 const checkData = await checkResponse.json();
+                console.log('Response data:', checkData);
 
                 if (!checkResponse.ok) {
                     errorEl.textContent = checkData.error || 'Invalid email address.';
@@ -282,7 +287,8 @@ class TuneForgeUltimate {
             }
         } catch (error) {
             console.error('Auth error:', error);
-            errorEl.textContent = 'Authentication failed. Please try again.';
+            console.error('Error details:', error.message, error.stack);
+            errorEl.textContent = error.message || 'Authentication failed. Please try again.';
         }
     }
     

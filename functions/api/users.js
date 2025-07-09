@@ -134,13 +134,17 @@ export async function onRequestPost(context) {
       }), { status: 400 });
     }
     
+    console.log('Users endpoint - email:', email);
+    
     // Check if this is a password check request
     if (!password && !passwordConfirm) {
       const user = await env.USERS.get(`user:${email}`, 'json');
+      console.log('Existing user check:', user ? 'found' : 'not found');
       
       if (!user) {
         // Check if this is an allowed domain for auto-registration
         const domain = email.split('@')[1];
+        console.log('Domain extracted:', domain);
         if (domain === 'morpheus.systems') {
           // Auto-create user account
           const team = await ensureTeam(env, email);
