@@ -20,11 +20,18 @@ export async function onRequest(context) {
     return next();
   }
   
-  // Get session from cookie
+  // Get session from cookie or header (fallback for Cloudflare Pages cookie issues)
   const cookie = request.headers.get('Cookie');
   console.log('[Middleware] Raw cookie header:', cookie);
-  const sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
-  console.log('[Middleware] Extracted session token:', sessionToken);
+  let sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+  
+  // If no cookie, check for session in header
+  if (!sessionToken) {
+    sessionToken = request.headers.get('X-Session-Token');
+    console.log('[Middleware] Session from header:', sessionToken);
+  } else {
+    console.log('[Middleware] Session from cookie:', sessionToken);
+  }
   
   if (!sessionToken) {
     console.log('[Middleware] No session token found in cookies');

@@ -181,6 +181,7 @@ export async function onRequestPost(context) {
     
     const response = new Response(JSON.stringify({ 
       success: true,
+      session: session.token,  // Include session token in response
       user: { 
         email: user.email, 
         teamId: user.teamId,

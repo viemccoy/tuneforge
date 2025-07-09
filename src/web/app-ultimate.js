@@ -114,10 +114,14 @@ class TuneForgeUltimate {
     
     // Helper method for authenticated fetch requests
     async fetchWithAuth(url, options = {}) {
+        // Get session token from storage
+        const sessionToken = sessionStorage.getItem('tuneforge_session');
+        
         const defaultOptions = {
             credentials: 'include', // Always include cookies
             headers: {
                 'Content-Type': 'application/json',
+                ...(sessionToken ? { 'X-Session-Token': sessionToken } : {}),
                 ...options.headers
             }
         };
@@ -263,6 +267,11 @@ class TuneForgeUltimate {
                 const createData = await createResponse.json();
 
                 if (createData.success) {
+                    // Store session token since cookies aren't working
+                    if (createData.session) {
+                        sessionStorage.setItem('tuneforge_session', createData.session);
+                        console.log('Session stored:', createData.session);
+                    }
                     this.currentUser = createData.user;
                     this.authenticated = true;
                     this.hideAuthModal();
@@ -288,6 +297,11 @@ class TuneForgeUltimate {
                 const loginData = await loginResponse.json();
 
                 if (loginData.success) {
+                    // Store session token since cookies aren't working
+                    if (loginData.session) {
+                        sessionStorage.setItem('tuneforge_session', loginData.session);
+                        console.log('Session stored:', loginData.session);
+                    }
                     this.currentUser = loginData.user;
                     this.authenticated = true;
                     this.hideAuthModal();
@@ -316,6 +330,9 @@ class TuneForgeUltimate {
     
     async logout() {
         try {
+            // Clear stored session
+            sessionStorage.removeItem('tuneforge_session');
+            
             await fetch(`${this.apiBase}/users`, {
                 method: 'DELETE',
                 credentials: 'include'
