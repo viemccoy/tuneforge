@@ -171,7 +171,7 @@ export async function onRequestPost(context) {
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Strict`
+        'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`
       }
     });
     

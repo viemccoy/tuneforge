@@ -232,7 +232,7 @@ export async function onRequestPost(context) {
         }
       }), {
         headers: {
-          'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Strict`
+          'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`
         }
       });
     }
@@ -262,7 +262,7 @@ export async function onRequestDelete(context) {
   
   return new Response(JSON.stringify({ success: true }), {
     headers: {
-      'Set-Cookie': 'session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0'
+      'Set-Cookie': 'session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
     }
   });
 }
