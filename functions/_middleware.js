@@ -20,17 +20,19 @@ export async function onRequest(context) {
     return next();
   }
   
-  // Get session from cookie or header (fallback for Cloudflare Pages cookie issues)
-  const cookie = request.headers.get('Cookie');
-  console.log('[Middleware] Raw cookie header:', cookie);
-  let sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+  // Get session from header first (preferred) or cookie (fallback)
+  let sessionToken = request.headers.get('X-Session-Token');
   
-  // If no cookie, check for session in header
-  if (!sessionToken) {
-    sessionToken = request.headers.get('X-Session-Token');
+  if (sessionToken) {
     console.log('[Middleware] Session from header:', sessionToken);
   } else {
-    console.log('[Middleware] Session from cookie:', sessionToken);
+    // Fallback to cookie if no header
+    const cookie = request.headers.get('Cookie');
+    console.log('[Middleware] Raw cookie header:', cookie);
+    sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+    if (sessionToken) {
+      console.log('[Middleware] Session from cookie:', sessionToken);
+    }
   }
   
   if (!sessionToken) {
@@ -60,7 +62,9 @@ export async function onRequest(context) {
   }
   
   // Get user details
+  console.log('[Middleware] Session email:', session.email);
   const user = await env.USERS.get(`user:${session.email}`, 'json');
+  console.log('[Middleware] User lookup result:', user ? 'found' : 'not found');
   if (!user) {
     return new Response(JSON.stringify({ 
       error: "User not found",
