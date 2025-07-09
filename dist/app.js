@@ -67,19 +67,9 @@ class TuneForgeUltimate {
         this.currentUser = null;
         
         if (this.isCloudflare) {
-            // Check if already authenticated
-            try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins`);
-                if (response.ok) {
-                    this.authenticated = true;
-                    this.hideAuthModal();
-                    this.initialize();
-                } else {
-                    this.showAuthModal();
-                }
-            } catch (error) {
-                this.showAuthModal();
-            }
+            // Don't check authentication by fetching bins - just show auth modal
+            // The session will be checked when the user actually logs in
+            this.showAuthModal();
         } else {
             // Socket.io mode - no auth needed
             this.authenticated = true;
@@ -194,49 +184,59 @@ class TuneForgeUltimate {
             // State 1: Password fields are not yet visible. This is the first click.
             if (passwordFieldsDiv.style.display === 'none' || passwordFieldsDiv.style.display === '') {
                 console.log('Making request to check user:', email);
+                console.log('Email includes @:', email.includes('@'));
+                console.log('Email length:', email.length);
                 console.log('API base:', this.apiBase);
                 authSubmitBtn.textContent = 'CHECKING...';
                 authSubmitBtn.disabled = true;
                 
-                const checkResponse = await fetch(`${this.apiBase}/users`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
+                try {
+                    const checkResponse = await fetch(`${this.apiBase}/users`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
 
-                console.log('Response status:', checkResponse.status);
-                const checkData = await checkResponse.json();
-                console.log('Response data:', checkData);
+                    console.log('Response status:', checkResponse.status);
+                    const checkData = await checkResponse.json();
+                    console.log('Response data:', checkData);
 
-                authSubmitBtn.disabled = false;
+                    authSubmitBtn.disabled = false;
 
-                if (!checkResponse.ok) {
-                    errorEl.textContent = checkData.error || 'Invalid email address.';
+                    if (!checkResponse.ok) {
+                        errorEl.textContent = checkData.error || 'Invalid email address.';
+                        authSubmitBtn.textContent = 'CONTINUE';
+                        return;
+                    }
+
+                    // Show the password fields container
+                    passwordFieldsDiv.style.display = 'block';
+                    passwordInput.style.display = 'block';
+                    passwordInput.focus();
+
+                    if (checkData.requiresPassword) {
+                        // Case: New user or first-time login for existing user.
+                        passwordConfirmInput.style.display = 'block';
+                        document.getElementById('confirmLabel').style.display = 'block';
+                        messageEl.textContent = checkData.message || 'Create your password';
+                        authSubmitBtn.textContent = 'CREATE PASSWORD';
+                    } else {
+                        // Case: Existing user with a password.
+                        // Make sure confirm fields are hidden for login
+                        passwordConfirmInput.style.display = 'none';
+                        document.getElementById('confirmLabel').style.display = 'none';
+                        messageEl.textContent = checkData.message || 'Enter your password';
+                        authSubmitBtn.textContent = 'LOGIN';
+                    }
+                    errorEl.textContent = '';
+                    return; // Wait for the user to enter password info.
+                } catch (innerError) {
+                    console.error('Error checking user:', innerError);
+                    errorEl.textContent = 'Error checking user. Please try again.';
                     authSubmitBtn.textContent = 'CONTINUE';
+                    authSubmitBtn.disabled = false;
                     return;
                 }
-
-                // Show the password fields container
-                passwordFieldsDiv.style.display = 'block';
-                passwordInput.style.display = 'block';
-                passwordInput.focus();
-
-                if (checkData.requiresPassword) {
-                    // Case: New user or first-time login for existing user.
-                    passwordConfirmInput.style.display = 'block';
-                    document.getElementById('confirmLabel').style.display = 'block';
-                    messageEl.textContent = checkData.message || 'Create your password';
-                    authSubmitBtn.textContent = 'CREATE PASSWORD';
-                } else {
-                    // Case: Existing user with a password.
-                    // Make sure confirm fields are hidden for login
-                    passwordConfirmInput.style.display = 'none';
-                    document.getElementById('confirmLabel').style.display = 'none';
-                    messageEl.textContent = checkData.message || 'Enter your password';
-                    authSubmitBtn.textContent = 'LOGIN';
-                }
-                errorEl.textContent = '';
-                return; // Wait for the user to enter password info.
             }
 
             // State 2: Password fields are visible. This is the second click.
