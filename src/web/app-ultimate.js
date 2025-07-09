@@ -116,6 +116,8 @@ class TuneForgeUltimate {
     async fetchWithAuth(url, options = {}) {
         // Get session token from storage
         const sessionToken = sessionStorage.getItem('tuneforge_session');
+        console.log('[fetchWithAuth] Session token:', sessionToken);
+        console.log('[fetchWithAuth] URL:', url);
         
         const defaultOptions = {
             credentials: 'include', // Always include cookies
@@ -126,8 +128,12 @@ class TuneForgeUltimate {
             }
         };
         
+        const mergedOptions = { ...defaultOptions, ...options };
+        console.log('[fetchWithAuth] Final headers:', mergedOptions.headers);
+        
         try {
-            const response = await fetch(url, { ...defaultOptions, ...options });
+            const response = await fetch(url, mergedOptions);
+            console.log('[fetchWithAuth] Response status:', response.status);
             
             // Handle authentication errors globally
             if (response.status === 401) {
@@ -295,12 +301,16 @@ class TuneForgeUltimate {
                 });
 
                 const loginData = await loginResponse.json();
+                console.log('Login response data:', loginData);
+                console.log('Login response has session?', 'session' in loginData);
 
                 if (loginData.success) {
                     // Store session token since cookies aren't working
                     if (loginData.session) {
                         sessionStorage.setItem('tuneforge_session', loginData.session);
                         console.log('Session stored:', loginData.session);
+                    } else {
+                        console.log('WARNING: No session token in login response!');
                     }
                     this.currentUser = loginData.user;
                     this.authenticated = true;
