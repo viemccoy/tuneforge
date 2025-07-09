@@ -694,7 +694,7 @@ class TuneForgeUltimate {
     async loadBins() {
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
@@ -984,7 +984,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`, {
                     method: 'POST',
                     body: JSON.stringify(bin)
                 });
