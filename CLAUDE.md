@@ -226,7 +226,7 @@ sanitizeInput(input) {
   - Multiple authentication patterns tried: _middleware.js, [[path]].js, api/_middleware.js
 - **Solution**:
   - Created auth wrapper utility (`/functions/auth-wrapper.js`) for inline authentication
-  - Built dedicated endpoints with built-in auth (`bins-fixed.js`, `migrate-fixed.js`)
+  - Built dedicated endpoints with built-in auth (`bins-fixed.js`, `migrate-fixed.js`, `conversations-fixed.js`, `presence-fixed.js`)
   - Store session tokens in sessionStorage and send via X-Session-Token header
   - User accounts stored in KV with email as key: `user:email@example.com`
   - Sessions stored in KV: `session:token` with user reference
@@ -234,6 +234,23 @@ sanitizeInput(input) {
   - Team-based bin organization prevents data loss
   - Proper user attribution and access control
   - Migration tool to assign existing bins to teams
+
+### 11. Fixed Endpoint Implementation
+- **Problem**: Conversations and presence endpoints were failing with 500 errors due to missing user context
+- **Root Cause**: These endpoints expected middleware to provide user object, but middleware wasn't running
+- **Solution**: Created fixed versions with inline authentication:
+  - `/api/conversations-fixed` - Handles conversation CRUD with proper auth and bin key format checking
+  - `/api/presence-fixed` - Manages real-time presence tracking with auth
+  - Both endpoints handle old bin key format (without team prefix) for backward compatibility
+- **Key Fixes**:
+  - Check both `bin:teamId:binId` and `binId` formats when looking up bins
+  - Pass through binId in conversation responses for proper UI updates
+  - Fixed presence endpoint to use GET method instead of OPTIONS
+
+### 12. Recovery System Fix
+- **Problem**: Recovered messages would disappear immediately after showing
+- **Solution**: Fixed `recoverConversation()` to pass bin object instead of ID to `selectBin()`
+- **Additional Fix**: Pass `skipNewConversation=true` to prevent clearing recovered messages
 
 ## Migration Process
 
@@ -268,6 +285,10 @@ fetch('/api/migrate-fixed', {
 - [x] User authentication and session management
 - [x] Team-based bin access control
 - [x] Migration tool for existing data
+- [x] Fixed endpoints with inline authentication
+- [x] Message recovery system
+- [ ] Bin selection and display
+- [ ] Conversation persistence after message weaving
 
 ## Notes
 

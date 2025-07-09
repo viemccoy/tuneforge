@@ -698,6 +698,11 @@ class TuneForgeUltimate {
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
+                // Hide the loading message
+                document.getElementById('binLoading').style.display = 'none';
+                if (this.bins.length === 0) {
+                    document.getElementById('noBinMessage').style.display = 'block';
+                }
             } catch (error) {
                 console.error('Failed to load bins:', error);
             }
@@ -715,6 +720,9 @@ class TuneForgeUltimate {
         
         if (this.bins.length === 0) {
             binList.innerHTML = '<div class="empty-state">No bins created yet</div>';
+            // Hide the "Failed to load" message and show the "No bin selected" message
+            document.getElementById('binLoading').style.display = 'none';
+            document.getElementById('noBinMessage').style.display = 'block';
             return;
         }
         
@@ -789,11 +797,18 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${binId}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations-fixed?binId=${binId}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Failed to load conversations:', response.status, errorText);
+                    conversations = [];
+                    return;
+                }
                 const data = await response.json();
                 conversations = data.conversations || [];
             } catch (error) {
                 console.error('Failed to load conversations:', error);
+                conversations = [];
                 convList.innerHTML = '<div class="error-state">Failed to load</div>';
                 return;
             }
@@ -933,12 +948,18 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${this.currentBin.id}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations-fixed?binId=${this.currentBin.id}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Failed to load conversations:', response.status, errorText);
+                    throw new Error('Failed to load conversations');
+                }
                 const data = await response.json();
                 this.conversations = data.conversations || [];
                 this.updateStats();
             } catch (error) {
                 console.error('Failed to load conversations:', error);
+                this.conversations = [];
             }
         } else {
             // In Socket.io mode, filter conversations by bin
@@ -3085,7 +3106,7 @@ class TuneForgeUltimate {
         // Select the bin
         const bin = this.bins.find(b => b.id === recoveryData.binId);
         if (bin) {
-            await this.selectBin(bin.id);
+            await this.selectBin(bin, true); // Skip new conversation creation
         }
         
         // Restore messages
