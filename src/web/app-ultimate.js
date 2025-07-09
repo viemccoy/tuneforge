@@ -3710,7 +3710,25 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         window.tuneforge = new TuneForgeUltimate();
         console.log('TuneForgeUltimate instance created successfully');
+        
+        // Set up auth handlers immediately if auth modal is visible
+        const authModal = document.getElementById('authModal');
+        if (authModal && authModal.classList.contains('active')) {
+            console.log('Auth modal is active, setting up handlers immediately');
+            window.tuneforge.setupAuthHandlers();
+        }
     } catch (error) {
         console.error('Error creating TuneForgeUltimate:', error);
+    }
+});
+
+// Also set up a global click handler as a fallback
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'authSubmit') {
+        console.log('Auth submit clicked via global handler');
+        e.preventDefault();
+        if (window.tuneforge) {
+            window.tuneforge.authenticate();
+        }
     }
 });
