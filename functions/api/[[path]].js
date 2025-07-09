@@ -1,25 +1,24 @@
-// Middleware for session-based authentication
+// Catch-all middleware for all /api/* routes
+// Using Cloudflare Pages Functions dynamic routing pattern
 
 const PUBLIC_PATHS = [
   '/api/auth',
   '/api/users',
-  '/api/test'
+  '/api/test',
+  '/api/session-test'
 ];
 
+// This will handle ALL HTTP methods
 export async function onRequest(context) {
-  const { request, env, next } = context;
+  const { request, env, next, params } = context;
   const url = new URL(request.url);
   
-  console.log('[Middleware] Processing request:', request.method, url.pathname);
+  console.log('[Middleware [[path]]] Processing request:', request.method, url.pathname);
+  console.log('[Middleware [[path]]] Params:', params);
   
   // Skip auth for public endpoints
   if (PUBLIC_PATHS.includes(url.pathname)) {
-    console.log('[Middleware] Skipping auth for public path');
-    return next();
-  }
-  
-  // Skip auth for static assets
-  if (!url.pathname.startsWith('/api/')) {
+    console.log('[Middleware [[path]]] Skipping auth for public path');
     return next();
   }
   
@@ -27,19 +26,19 @@ export async function onRequest(context) {
   let sessionToken = request.headers.get('X-Session-Token');
   
   if (sessionToken) {
-    console.log('[Middleware] Session from header:', sessionToken);
+    console.log('[Middleware [[path]]] Session from header:', sessionToken);
   } else {
     // Fallback to cookie if no header
     const cookie = request.headers.get('Cookie');
-    console.log('[Middleware] Raw cookie header:', cookie);
+    console.log('[Middleware [[path]]] Raw cookie header:', cookie);
     sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
     if (sessionToken) {
-      console.log('[Middleware] Session from cookie:', sessionToken);
+      console.log('[Middleware [[path]]] Session from cookie:', sessionToken);
     }
   }
   
   if (!sessionToken) {
-    console.log('[Middleware] No session token found in cookies');
+    console.log('[Middleware [[path]]] No session token found');
     return new Response(JSON.stringify({ 
       error: "Authentication required",
       code: "NO_SESSION"
@@ -49,10 +48,10 @@ export async function onRequest(context) {
     });
   }
   
-  // Verify session (no expiry check needed)
-  console.log('[Middleware] Looking up session:', `session:${sessionToken}`);
+  // Verify session
+  console.log('[Middleware [[path]]] Looking up session:', `session:${sessionToken}`);
   const session = await env.SESSIONS.get(`session:${sessionToken}`, 'json');
-  console.log('[Middleware] Session lookup result:', session ? 'found' : 'not found');
+  console.log('[Middleware [[path]]] Session lookup result:', session ? 'found' : 'not found');
   
   if (!session) {
     return new Response(JSON.stringify({ 
@@ -65,10 +64,10 @@ export async function onRequest(context) {
   }
   
   // Get user details
-  console.log('[Middleware] Session email:', session.email);
-  console.log('[Middleware] Session full structure:', JSON.stringify(session));
+  console.log('[Middleware [[path]]] Session email:', session.email);
   const user = await env.USERS.get(`user:${session.email}`, 'json');
-  console.log('[Middleware] User lookup result:', user ? 'found' : 'not found');
+  console.log('[Middleware [[path]]] User lookup result:', user ? 'found' : 'not found');
+  
   if (!user) {
     return new Response(JSON.stringify({ 
       error: "User not found",
@@ -83,19 +82,19 @@ export async function onRequest(context) {
     });
   }
   
-  // Add user to context for use in API endpoints
-  // Endpoints expect context.user directly
+  // Add user to context
+  console.log('[Middleware [[path]]] Setting user in context');
   context.user = user;
   context.session = session;
   
-  // Also add to context.data for backwards compatibility
+  // Also add to context.data for compatibility
   context.data = context.data || {};
   context.data.user = user;
   context.data.session = session;
   
-  // Log access for monitoring
+  // Log access
   console.log(`[Access] ${session.email} -> ${request.method} ${url.pathname}`);
-  console.log('[Middleware] User set in context, proceeding to endpoint');
+  console.log('[Middleware [[path]]] User set, proceeding to endpoint');
   
   return next();
 }
