@@ -229,8 +229,7 @@ export async function onRequestPost(context) {
 export async function onRequestPut(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const pathParts = url.pathname.split('/');
-  const convId = pathParts.pop();
+  const convId = url.searchParams.get('id');
   
   try {
     // Authenticate
@@ -301,8 +300,7 @@ export async function onRequestPut(context) {
 export async function onRequestDelete(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const pathParts = url.pathname.split('/');
-  const convId = pathParts.pop();
+  const convId = url.searchParams.get('id');
   const binId = url.searchParams.get('binId');
   
   try {

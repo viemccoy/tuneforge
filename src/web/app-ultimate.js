@@ -2296,17 +2296,26 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const endpoint = isNewConversation 
-                    ? `${this.apiBase}/conversations-fixed`
-                    : `${this.apiBase}/conversations-fixed/${conversationId}`;
+                const endpoint = `${this.apiBase}/conversations-fixed`;
+                const method = isNewConversation ? 'POST' : 'PUT';
+                
+                // For PUT requests, add the conversation ID as a query parameter
+                const url = isNewConversation 
+                    ? endpoint 
+                    : `${endpoint}?id=${conversationId}`;
                     
-                const response = await this.fetchWithAuth(endpoint, {
-                    method: isNewConversation ? 'POST' : 'PUT',
+                const response = await this.fetchWithAuth(url, {
+                    method: method,
                     body: JSON.stringify(conversation)
                 });
                 
-                if (response.ok) {
-                    const savedConv = await response.json();
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('[TuneForge] Failed to save conversation:', response.status, errorText);
+                    throw new Error(`Failed to save: ${response.status} ${errorText}`);
+                }
+                
+                const savedConv = await response.json();
                     
                     if (isNewConversation) {
                         this.currentConversationId = savedConv.id;
@@ -2466,7 +2475,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/conversations-fixed/${this.currentConversationId}?binId=${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations-fixed?id=${this.currentConversationId}&binId=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
