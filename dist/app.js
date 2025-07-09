@@ -163,6 +163,7 @@ class TuneForgeUltimate {
     }
     
     async authenticate() {
+        console.log('authenticate() called');
         const emailInput = document.getElementById('authEmail');
         const passwordInput = document.getElementById('authPassword');
         const passwordConfirmInput = document.getElementById('authPasswordConfirm');
@@ -175,6 +176,9 @@ class TuneForgeUltimate {
         const password = passwordInput.value;
         const passwordConfirm = passwordConfirmInput.value;
 
+        console.log('Email value:', email);
+        console.log('Password fields display:', passwordFieldsDiv.style.display);
+
         if (!email) {
             errorEl.textContent = 'Email required';
             return;
@@ -183,6 +187,7 @@ class TuneForgeUltimate {
         try {
             // State 1: Password fields are not yet visible. This is the first click.
             if (passwordFieldsDiv.style.display === 'none') {
+                console.log('Making request to check user:', email);
                 const checkResponse = await fetch(`${this.apiBase}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
