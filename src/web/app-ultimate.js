@@ -70,46 +70,81 @@ class TuneForgeUltimate {
             // Don't check authentication by fetching bins - just show auth modal
             // The session will be checked when the user actually logs in
             this.showAuthModal();
+            // Set up auth handlers after showing modal
+            setTimeout(() => this.setupAuthHandlers(), 100);
         } else {
             // Socket.io mode - no auth needed
             this.authenticated = true;
             this.hideAuthModal();
             this.initialize();
         }
+    }
+    
+    setupAuthHandlers() {
+        console.log('Setting up auth handlers');
         
         // Auth form handlers
         const authSubmitBtn = document.getElementById('authSubmit');
         if (authSubmitBtn) {
+            console.log('Found authSubmit button, adding click handler');
             authSubmitBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 console.log('Continue button clicked');
                 this.authenticate();
             });
         } else {
-            console.error('authSubmit button not found!');
+            console.error('authSubmit button not found! Retrying...');
+            // Retry after a delay
+            setTimeout(() => {
+                const btn = document.getElementById('authSubmit');
+                if (btn) {
+                    console.log('Found authSubmit button on retry');
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        console.log('Continue button clicked');
+                        this.authenticate();
+                    });
+                }
+            }, 500);
         }
         
-        document.getElementById('authEmail')?.addEventListener('keypress', (e) => {
-            console.log('Key pressed in email field:', e.key);
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                console.log('Enter key pressed, calling authenticate()');
-                this.authenticate();
-            }
-        });
-        document.getElementById('authPassword')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.authenticate();
-            }
-        });
-        document.getElementById('authPasswordConfirm')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.authenticate();
-            }
-        });
-        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
+        const emailField = document.getElementById('authEmail');
+        if (emailField) {
+            console.log('Setting up email field enter handler');
+            emailField.addEventListener('keypress', (e) => {
+                console.log('Key pressed in email field:', e.key);
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    console.log('Enter key pressed, calling authenticate()');
+                    this.authenticate();
+                }
+            });
+        }
+        
+        const passwordField = document.getElementById('authPassword');
+        if (passwordField) {
+            passwordField.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.authenticate();
+                }
+            });
+        }
+        
+        const confirmField = document.getElementById('authPasswordConfirm');
+        if (confirmField) {
+            confirmField.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.authenticate();
+                }
+            });
+        }
+        
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        }
     }
     
     // Helper method for authenticated fetch requests
