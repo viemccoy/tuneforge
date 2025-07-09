@@ -99,15 +99,37 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   
   console.log('[Auth] Login attempt started');
+  console.log('[Auth] Request URL:', request.url);
+  console.log('[Auth] Request method:', request.method);
   
   try {
-    const { email, password } = await request.json();
+    const body = await request.text();
+    console.log('[Auth] Request body:', body);
+    
+    let email, password;
+    try {
+      const parsed = JSON.parse(body);
+      email = parsed.email;
+      password = parsed.password;
+    } catch (parseError) {
+      console.error('[Auth] Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({ 
+        error: "Invalid request body",
+        details: parseError.message
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     console.log('[Auth] Login attempt for email:', email);
     
     if (!email) {
       return new Response(JSON.stringify({ 
         error: "Email required" 
-      }), { status: 400 });
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     
     // Get user
@@ -197,7 +219,24 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error('Auth error:', error);
     return new Response(JSON.stringify({ 
-      error: "Authentication failed" 
-    }), { status: 500 });
+      error: "Authentication failed",
+      details: error.message
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
+}
+
+// Handle CORS preflight
+export async function onRequestOptions(context) {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token',
+      'Access-Control-Max-Age': '86400',
+    }
+  });
 }

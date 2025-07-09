@@ -125,16 +125,41 @@ async function ensureTeam(env, email) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  console.log('[Users] Request received');
+  console.log('[Users] Request URL:', request.url);
+  console.log('[Users] Request method:', request.method);
+  
   try {
-    const { email, password, passwordConfirm } = await request.json();
+    const body = await request.text();
+    console.log('[Users] Request body:', body);
+    
+    let email, password, passwordConfirm;
+    try {
+      const parsed = JSON.parse(body);
+      email = parsed.email;
+      password = parsed.password;
+      passwordConfirm = parsed.passwordConfirm;
+    } catch (parseError) {
+      console.error('[Users] Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({ 
+        error: "Invalid request body",
+        details: parseError.message
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     
     if (!email) {
       return new Response(JSON.stringify({ 
         error: "Email required" 
-      }), { status: 400 });
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     
-    console.log('Users endpoint - email:', email);
+    console.log('[Users] Processing request for email:', email);
     
     // Check if this is a password check request
     if (!password && !passwordConfirm) {
@@ -250,9 +275,26 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error('User registration error:', error);
     return new Response(JSON.stringify({ 
-      error: "Internal server error" 
-    }), { status: 500 });
+      error: "Internal server error",
+      details: error.message
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
+}
+
+// Handle CORS preflight
+export async function onRequestOptions(context) {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Session-Token',
+      'Access-Control-Max-Age': '86400',
+    }
+  });
 }
 
 // Logout endpoint

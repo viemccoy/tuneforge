@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth</title>
+</head>
+<body>
+    <h1>Debug TuneForge Auth</h1>
+    <button onclick="testAuth()">Test Auth Endpoint</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testAuth() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing...\n';
+            
+            try {
+                // Test 1: Check if auth endpoint responds
+                output.textContent += '\n1. Testing auth endpoint...\n';
+                const response = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ 
+                        email: 'vie@morpheus.systems',
+                        password: '' // Empty for first login
+                    })
+                });
+                
+                output.textContent += `Status: ${response.status}\n`;
+                output.textContent += `Headers: ${JSON.stringify(Object.fromEntries(response.headers))}\n`;
+                
+                const data = await response.json();
+                output.textContent += `Response: ${JSON.stringify(data, null, 2)}\n`;
+                
+                // Check if session was stored
+                const sessionToken = sessionStorage.getItem('tuneforge_session');
+                output.textContent += `\nSession in storage: ${sessionToken}\n`;
+                
+            } catch (error) {
+                output.textContent += `\nError: ${error.message}\n`;
+                output.textContent += `Stack: ${error.stack}\n`;
+            }
+        }
+        
+        // Auto-run on load
+        window.onload = () => {
+            document.getElementById('output').textContent = 'Ready to test. Click button above.\n';
+        };
+    </script>
+</body>
+</html>

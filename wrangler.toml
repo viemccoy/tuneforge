@@ -15,6 +15,26 @@ binding = "CONVERSATIONS"
 id = "your-conversations-namespace-id"
 preview_id = "your-conversations-preview-id"
 
+[[kv_namespaces]]
+binding = "USERS"
+id = "your-users-namespace-id"
+preview_id = "your-users-preview-id"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "your-sessions-namespace-id"
+preview_id = "your-sessions-preview-id"
+
+[[kv_namespaces]]
+binding = "TEAMS"
+id = "your-teams-namespace-id"
+preview_id = "your-teams-preview-id"
+
+[[kv_namespaces]]
+binding = "PRESENCE"
+id = "your-presence-namespace-id"
+preview_id = "your-presence-preview-id"
+
 [[durable_objects]]
 name = "WebSocketDurableObject"
 class_name = "WebSocketDurableObject"
