@@ -1274,6 +1274,21 @@ class TuneForgeUltimate {
         document.getElementById('modelCount').textContent = this.selectedModels.length;
     }
     
+    updateModelSelectionUI() {
+        // Update all model option elements to reflect current selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            const modelId = el.dataset.modelId;
+            if (this.selectedModels.includes(modelId)) {
+                el.classList.add('selected');
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+        
+        // Also save to localStorage for consistency
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
+    }
+    
     // Conversation Management
     async loadConversation(conversation) {
         // Stop tracking previous conversation
@@ -1297,6 +1312,21 @@ class TuneForgeUltimate {
         if (conversation.metadata?.temperature !== undefined) {
             document.getElementById('temperature').value = conversation.metadata.temperature;
             document.getElementById('temperatureValue').textContent = conversation.metadata.temperature;
+        }
+        
+        // Load maxTokens from conversation metadata if available
+        if (conversation.metadata?.maxTokens !== undefined) {
+            document.getElementById('maxTokensValue').textContent = conversation.metadata.maxTokens;
+        }
+        
+        // Load models from conversation metadata if available
+        if (conversation.metadata?.models && Array.isArray(conversation.metadata.models)) {
+            this.selectedModels = conversation.metadata.models.filter(modelId => 
+                this.availableModels.some(m => m.id === modelId)
+            );
+            // Update model selection UI
+            this.updateModelSelectionUI();
+            this.updateModelCount();
         }
         
         // Load conversation into the UI
@@ -2373,7 +2403,8 @@ class TuneForgeUltimate {
                 turnCount: Math.floor(this.currentMessages.length / 2),
                 models: this.selectedModels,
                 lastModel: this.currentMessages[this.currentMessages.length - 1]?.model,
-                temperature: parseFloat(document.getElementById('temperature').value)
+                temperature: parseFloat(document.getElementById('temperature').value),
+                maxTokens: parseInt(document.getElementById('maxTokensValue').textContent)
             }
         };
         

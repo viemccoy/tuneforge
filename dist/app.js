@@ -507,6 +507,22 @@ class TuneForgeUltimate {
         // Parameters
         document.getElementById('temperature').addEventListener('input', (e) => {
             document.getElementById('temperatureValue').textContent = e.target.value;
+            // Update bin's default temperature when changed
+            if (this.currentBin) {
+                this.updateBinSettings({ defaultTemperature: parseFloat(e.target.value) });
+            }
+        });
+        
+        // System Prompt changes
+        let systemPromptTimeout;
+        document.getElementById('systemPrompt').addEventListener('input', (e) => {
+            // Debounce system prompt updates
+            clearTimeout(systemPromptTimeout);
+            systemPromptTimeout = setTimeout(() => {
+                if (this.currentBin && e.target.value !== this.currentBin.systemPrompt) {
+                    this.updateBinSettings({ systemPrompt: e.target.value });
+                }
+            }, 1000); // Update after 1 second of no typing
         });
         
         // Token Controls
@@ -694,7 +710,7 @@ class TuneForgeUltimate {
     async loadBins() {
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`);
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
@@ -886,6 +902,12 @@ class TuneForgeUltimate {
         document.getElementById('currentBinName').textContent = bin.name;
         document.getElementById('systemPrompt').value = bin.systemPrompt;
         
+        // Load bin's default temperature if available
+        if (bin.defaultTemperature !== undefined) {
+            document.getElementById('temperature').value = bin.defaultTemperature;
+            document.getElementById('temperatureValue').textContent = bin.defaultTemperature;
+        }
+        
         // Show bin-specific UI
         document.querySelector('.app-container').classList.remove('no-bin-selected');
         document.querySelector('.app-container').classList.add('bin-selected');
@@ -979,12 +1001,13 @@ class TuneForgeUltimate {
             systemPrompt,
             description,
             createdAt: new Date().toISOString(),
-            conversationCount: 0
+            conversationCount: 0,
+            defaultTemperature: parseFloat(document.getElementById('temperature').value)
         };
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`, {
                     method: 'POST',
                     body: JSON.stringify(bin)
                 });
@@ -1016,6 +1039,40 @@ class TuneForgeUltimate {
         document.getElementById('binName').value = '';
         document.getElementById('binSystemPrompt').value = '';
         document.getElementById('binDescription').value = '';
+    }
+    
+    async updateBinSettings(updates) {
+        if (!this.currentBin) return;
+        
+        // Update local bin object
+        Object.assign(this.currentBin, updates);
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth/${this.currentBin.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updates)
+                });
+                
+                if (response.ok) {
+                    const updatedBin = await response.json();
+                    // Update local bin with server response
+                    const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+                    if (binIndex > -1) {
+                        this.bins[binIndex] = updatedBin;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to update bin settings:', error);
+            }
+        } else {
+            // Local storage mode
+            const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+            if (binIndex > -1) {
+                this.bins[binIndex] = this.currentBin;
+                localStorage.setItem('tuneforge_bins', JSON.stringify(this.bins));
+            }
+        }
     }
     
     async deleteBin() {
@@ -1130,10 +1187,10 @@ class TuneForgeUltimate {
             this.availableModels = [
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
+                { id: 'o3-pro-2025-04-16', name: 'GPT-o3-pro', provider: 'openai' },
                 { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
-                { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
-                { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' },
                 { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
                 { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
                 { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
@@ -1148,6 +1205,21 @@ class TuneForgeUltimate {
     renderModelSelection() {
         const container = document.getElementById('modelSelection');
         container.innerHTML = '';
+        
+        // Load saved model selection from localStorage
+        const savedModels = localStorage.getItem('tuneforge_selected_models');
+        if (savedModels) {
+            try {
+                this.selectedModels = JSON.parse(savedModels);
+                // Filter out models that are no longer available
+                this.selectedModels = this.selectedModels.filter(modelId => 
+                    this.availableModels.some(m => m.id === modelId)
+                );
+            } catch (e) {
+                console.warn('Failed to load saved model selection:', e);
+                this.selectedModels = [];
+            }
+        }
         
         this.availableModels.forEach(model => {
             const modelEl = document.createElement('div');
@@ -1176,6 +1248,9 @@ class TuneForgeUltimate {
             this.selectedModels.push(modelId);
         }
         
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
+        
         // Update UI
         const modelEl = document.querySelector(`[data-model-id="${modelId}"]`);
         if (modelEl) {
@@ -1187,6 +1262,8 @@ class TuneForgeUltimate {
     
     selectAllModels() {
         this.selectedModels = this.availableModels.map(m => m.id);
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
         document.querySelectorAll('.model-option').forEach(el => {
             el.classList.add('selected');
         });
@@ -1195,6 +1272,21 @@ class TuneForgeUltimate {
     
     updateModelCount() {
         document.getElementById('modelCount').textContent = this.selectedModels.length;
+    }
+    
+    updateModelSelectionUI() {
+        // Update all model option elements to reflect current selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            const modelId = el.dataset.modelId;
+            if (this.selectedModels.includes(modelId)) {
+                el.classList.add('selected');
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+        
+        // Also save to localStorage for consistency
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
     }
     
     // Conversation Management
@@ -1209,6 +1301,33 @@ class TuneForgeUltimate {
         this.currentConversationId = conversation.id;
         this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
         this.currentConversationDescription = conversation.description || '';
+        
+        // Extract and set system prompt from conversation
+        const systemMessage = conversation.messages.find(m => m.role === 'system');
+        if (systemMessage) {
+            document.getElementById('systemPrompt').value = systemMessage.content;
+        }
+        
+        // Load temperature from conversation metadata if available
+        if (conversation.metadata?.temperature !== undefined) {
+            document.getElementById('temperature').value = conversation.metadata.temperature;
+            document.getElementById('temperatureValue').textContent = conversation.metadata.temperature;
+        }
+        
+        // Load maxTokens from conversation metadata if available
+        if (conversation.metadata?.maxTokens !== undefined) {
+            document.getElementById('maxTokensValue').textContent = conversation.metadata.maxTokens;
+        }
+        
+        // Load models from conversation metadata if available
+        if (conversation.metadata?.models && Array.isArray(conversation.metadata.models)) {
+            this.selectedModels = conversation.metadata.models.filter(modelId => 
+                this.availableModels.some(m => m.id === modelId)
+            );
+            // Update model selection UI
+            this.updateModelSelectionUI();
+            this.updateModelCount();
+        }
         
         // Load conversation into the UI
         this.currentMessages = conversation.messages.filter(m => m.role !== 'system');
@@ -2283,7 +2402,9 @@ class TuneForgeUltimate {
                 updatedAt: new Date().toISOString(),
                 turnCount: Math.floor(this.currentMessages.length / 2),
                 models: this.selectedModels,
-                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model
+                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model,
+                temperature: parseFloat(document.getElementById('temperature').value),
+                maxTokens: parseInt(document.getElementById('maxTokensValue').textContent)
             }
         };
         

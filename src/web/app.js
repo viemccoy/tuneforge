@@ -1,6 +1,9 @@
 // TuneForge Ultimate - Combining Original Power with Bin Management
+console.log('TuneForge Ultimate script loaded');
+
 class TuneForgeUltimate {
     constructor() {
+        console.log('TuneForgeUltimate constructor called');
         // Authentication
         this.authenticated = false;
         
@@ -25,6 +28,29 @@ class TuneForgeUltimate {
             modelUsage: {}
         };
         
+        // Request management
+        this.isGenerating = false;
+        this.activeRequestId = null;
+        
+        // Rate limiting and request protection
+        this.requestTimestamps = new Map();
+        this.rateLimitWindow = 60000; // 1 minute
+        this.maxRequestsPerWindow = 30;
+        this.requestQueue = [];
+        this.processingQueue = false;
+        
+        // Input validation limits
+        this.maxMessageLength = 10000;
+        this.maxConversationNameLength = 100;
+        this.maxBinNameLength = 50;
+        this.maxSystemPromptLength = 2000;
+        
+        // No session timeouts - sessions persist forever
+        
+        // Presence tracking
+        this.connectedUsers = new Map();
+        this.userId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
         // Cloudflare or Socket.io mode
         this.isCloudflare = window.location.hostname.includes('pages.dev') || 
                           window.location.hostname.includes('cloudflare') ||
@@ -36,20 +62,14 @@ class TuneForgeUltimate {
     }
     
     async initializeAuth() {
+        console.log('initializeAuth() called');
+        // Store user info
+        this.currentUser = null;
+        
         if (this.isCloudflare) {
-            // Check if already authenticated
-            try {
-                const response = await fetch(`${this.apiBase}/bins`);
-                if (response.ok) {
-                    this.authenticated = true;
-                    this.hideAuthModal();
-                    this.initialize();
-                } else {
-                    this.showAuthModal();
-                }
-            } catch (error) {
-                this.showAuthModal();
-            }
+            // Don't check authentication by fetching bins - just show auth modal
+            // The session will be checked when the user actually logs in
+            this.showAuthModal();
         } else {
             // Socket.io mode - no auth needed
             this.authenticated = true;
@@ -57,42 +77,289 @@ class TuneForgeUltimate {
             this.initialize();
         }
         
-        // Auth form handler
-        document.getElementById('authSubmit').addEventListener('click', () => this.authenticate());
-        document.getElementById('authPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.authenticate();
+        // Auth form handlers
+        const authSubmitBtn = document.getElementById('authSubmit');
+        if (authSubmitBtn) {
+            authSubmitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Continue button clicked');
+                this.authenticate();
+            });
+        } else {
+            console.error('authSubmit button not found!');
+        }
+        
+        document.getElementById('authEmail')?.addEventListener('keypress', (e) => {
+            console.log('Key pressed in email field:', e.key);
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                console.log('Enter key pressed, calling authenticate()');
+                this.authenticate();
+            }
         });
+        document.getElementById('authPassword')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.authenticate();
+            }
+        });
+        document.getElementById('authPasswordConfirm')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.authenticate();
+            }
+        });
+        document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
+    }
+    
+    // Helper method for authenticated fetch requests
+    async fetchWithAuth(url, options = {}) {
+        // Get session token from storage
+        const sessionToken = sessionStorage.getItem('tuneforge_session');
+        console.log('[fetchWithAuth] Session token:', sessionToken);
+        console.log('[fetchWithAuth] URL:', url);
+        
+        const defaultOptions = {
+            credentials: 'include', // Always include cookies
+            headers: {
+                'Content-Type': 'application/json',
+                ...(sessionToken ? { 'X-Session-Token': sessionToken } : {}),
+                ...options.headers
+            }
+        };
+        
+        const mergedOptions = { ...defaultOptions, ...options };
+        console.log('[fetchWithAuth] Final headers:', mergedOptions.headers);
+        
+        try {
+            const response = await fetch(url, mergedOptions);
+            console.log('[fetchWithAuth] Response status:', response.status);
+            
+            // Handle authentication errors globally
+            if (response.status === 401) {
+                this.handleAuthError();
+                throw new Error('Authentication failed');
+            }
+            
+            // Handle rate limiting
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After') || '60';
+                throw new Error(`Rate limit exceeded. Try again in ${retryAfter} seconds.`);
+            }
+            
+            return response;
+        } catch (error) {
+            // Network errors
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                throw new Error('Network error. Please check your connection.');
+            }
+            throw error;
+        }
+    }
+    
+    handleAuthError() {
+        // Only show auth modal once
+        if (!this.authErrorHandled) {
+            this.authErrorHandled = true;
+            this.showNotification('Authentication required. Please log in again.', 'error');
+            setTimeout(() => {
+                this.showAuthModal();
+            }, 1000);
+        }
     }
     
     async authenticate() {
-        const password = document.getElementById('authPassword').value;
+        console.log('authenticate() called');
+        const emailInput = document.getElementById('authEmail');
+        const passwordInput = document.getElementById('authPassword');
+        const passwordConfirmInput = document.getElementById('authPasswordConfirm');
         const errorEl = document.getElementById('authError');
-        
+        const messageEl = document.getElementById('authMessage');
+        const passwordFieldsDiv = document.getElementById('passwordFields');
+        const authSubmitBtn = document.getElementById('authSubmit');
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+        const passwordConfirm = passwordConfirmInput.value;
+
+        console.log('Email value:', email);
+        console.log('Password fields display:', passwordFieldsDiv.style.display);
+
+        if (!email) {
+            errorEl.textContent = 'Email required';
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.apiBase}/auth`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.authenticated = true;
-                this.hideAuthModal();
-                this.initialize();
+            // State 1: Password fields are not yet visible. This is the first click.
+            if (passwordFieldsDiv.style.display === 'none' || passwordFieldsDiv.style.display === '') {
+                console.log('Making request to check user:', email);
+                console.log('Email includes @:', email.includes('@'));
+                console.log('Email length:', email.length);
+                console.log('API base:', this.apiBase);
+                authSubmitBtn.textContent = 'CHECKING...';
+                authSubmitBtn.disabled = true;
+                
+                try {
+                    const checkResponse = await fetch(`${this.apiBase}/users`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+
+                    console.log('Response status:', checkResponse.status);
+                    const checkData = await checkResponse.json();
+                    console.log('Response data:', checkData);
+
+                    authSubmitBtn.disabled = false;
+
+                    if (!checkResponse.ok) {
+                        errorEl.textContent = checkData.error || 'Invalid email address.';
+                        authSubmitBtn.textContent = 'CONTINUE';
+                        return;
+                    }
+
+                    // Show the password fields container
+                    passwordFieldsDiv.style.display = 'block';
+                    passwordInput.style.display = 'block';
+                    passwordInput.focus();
+
+                    if (checkData.requiresPassword) {
+                        // Case: New user or first-time login for existing user.
+                        passwordConfirmInput.style.display = 'block';
+                        document.getElementById('confirmLabel').style.display = 'block';
+                        messageEl.textContent = checkData.message || 'Create your password';
+                        authSubmitBtn.textContent = 'CREATE PASSWORD';
+                    } else {
+                        // Case: Existing user with a password.
+                        // Make sure confirm fields are hidden for login
+                        passwordConfirmInput.style.display = 'none';
+                        document.getElementById('confirmLabel').style.display = 'none';
+                        messageEl.textContent = checkData.message || 'Enter your password';
+                        authSubmitBtn.textContent = 'LOGIN';
+                    }
+                    errorEl.textContent = '';
+                    return; // Wait for the user to enter password info.
+                } catch (innerError) {
+                    console.error('Error checking user:', innerError);
+                    errorEl.textContent = 'Error checking user. Please try again.';
+                    authSubmitBtn.textContent = 'CONTINUE';
+                    authSubmitBtn.disabled = false;
+                    return;
+                }
+            }
+
+            // State 2: Password fields are visible. This is the second click.
+            // We are either creating a password or logging in.
+
+            if (passwordConfirmInput.style.display === 'block') {
+                // Action: Create Password
+                if (password !== passwordConfirm) {
+                    errorEl.textContent = 'Passwords do not match';
+                    return;
+                }
+                if (password.length < 8) {
+                    errorEl.textContent = 'Password must be at least 8 characters';
+                    return;
+                }
+
+                const createResponse = await fetch(`${this.apiBase}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password, passwordConfirm })
+                });
+
+                const createData = await createResponse.json();
+
+                if (createData.success) {
+                    // Store session token since cookies aren't working
+                    if (createData.session) {
+                        sessionStorage.setItem('tuneforge_session', createData.session);
+                        console.log('Session stored:', createData.session);
+                    }
+                    this.currentUser = createData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(createData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = createData.error || 'Password creation failed';
+                }
             } else {
-                errorEl.textContent = 'Invalid password';
-                document.getElementById('authPassword').value = '';
+                // Action: Login
+                if (!password) {
+                    errorEl.textContent = 'Password required';
+                    return;
+                }
+
+                const loginResponse = await fetch(`${this.apiBase}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+
+                const loginData = await loginResponse.json();
+                console.log('Login response data:', loginData);
+                console.log('Login response has session?', 'session' in loginData);
+
+                if (loginData.success) {
+                    // Store session token since cookies aren't working
+                    if (loginData.session) {
+                        sessionStorage.setItem('tuneforge_session', loginData.session);
+                        console.log('Session stored:', loginData.session);
+                    } else {
+                        console.log('WARNING: No session token in login response!');
+                    }
+                    this.currentUser = loginData.user;
+                    this.authenticated = true;
+                    this.hideAuthModal();
+                    this.showUserInfo(loginData.user);
+                    this.initialize();
+                } else {
+                    errorEl.textContent = loginData.error || 'Invalid credentials';
+                    passwordInput.value = '';
+                }
             }
         } catch (error) {
-            errorEl.textContent = 'Authentication failed';
+            console.error('Auth error:', error);
+            console.error('Error details:', error.message, error.stack);
+            errorEl.textContent = error.message || 'Authentication failed. Please try again.';
+            messageEl.textContent = '';
+            authSubmitBtn.textContent = 'CONTINUE';
+            authSubmitBtn.disabled = false;
         }
+    }
+    
+    showUserInfo(user) {
+        document.getElementById('userInfo').style.display = 'flex';
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userTeam').textContent = `[${user.teamId}]`;
+    }
+    
+    async logout() {
+        try {
+            // Clear stored session
+            sessionStorage.removeItem('tuneforge_session');
+            
+            await fetch(`${this.apiBase}/users`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        
+        // Clear local state and reload
+        this.authenticated = false;
+        this.currentUser = null;
+        window.location.reload();
     }
     
     showAuthModal() {
         document.getElementById('authModal').classList.add('active');
-        document.getElementById('authPassword').focus();
+        document.getElementById('authEmail').focus();
     }
     
     hideAuthModal() {
@@ -118,13 +385,79 @@ class TuneForgeUltimate {
             document.getElementById('connectionDot').classList.add('connected');
         }
         
-        // Load initial data
-        await this.loadBins();
+        // Load initial data - don't let this block the UI
+        try {
+            await this.loadBins();
+        } catch (error) {
+            console.error('Failed to load bins on init:', error);
+            // Show empty state but let user continue
+            this.showMessage('Unable to load bins. You can still create a new bin.', 'warning');
+        }
         await this.loadModels();
         await this.loadSavedPrompts();
         
         // Setup collapsible sections
         this.setupCollapsibles();
+        
+        // Initialize Loom
+        this.loom = new ConversationLoom(this);
+        
+        // Check for any pending messages that may have been lost
+        this.checkPendingMessage();
+        
+        // Check for recovery data after bins are loaded
+        const recoveryData = this.checkForRecoveryData();
+        if (recoveryData) {
+            const confirmed = await this.showConfirmDialog({
+                title: 'Recover Previous Session',
+                message: 'Found unsaved work from a previous session.',
+                details: `${recoveryData.messages.length} messages in bin "${recoveryData.binId}"`,
+                confirmText: 'RECOVER',
+                cancelText: 'DISCARD'
+            });
+            
+            if (confirmed) {
+                await this.recoverConversation(recoveryData);
+            } else {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+            }
+        }
+        
+        // No session monitoring - sessions persist forever
+        
+        // Network status monitoring
+        this.setupNetworkMonitoring();
+        
+        // Start periodic saves
+        this.startPeriodicSaves();
+        
+        // Clean up presence on page unload
+        window.addEventListener('beforeunload', (e) => {
+            if (this.currentConversationId && this.currentBin) {
+                // Use sendBeacon for reliable cleanup on page close
+                const data = JSON.stringify({
+                    conversationId: this.currentConversationId,
+                    userId: this.userId,
+                    action: 'leave'
+                });
+                navigator.sendBeacon(`${this.apiBase}/presence`, data);
+            }
+            
+            // Save conversation state one more time before unload
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+                
+                // If there's an active loom (unselected responses), warn the user
+                if (this.activeLoom) {
+                    e.preventDefault();
+                    e.returnValue = 'You have unselected AI responses. Are you sure you want to leave?';
+                    return e.returnValue;
+                }
+            }
+            
+            // Stop periodic saves
+            this.stopPeriodicSaves();
+        });
     }
     
     initializeEventListeners() {
@@ -174,6 +507,22 @@ class TuneForgeUltimate {
         // Parameters
         document.getElementById('temperature').addEventListener('input', (e) => {
             document.getElementById('temperatureValue').textContent = e.target.value;
+            // Update bin's default temperature when changed
+            if (this.currentBin) {
+                this.updateBinSettings({ defaultTemperature: parseFloat(e.target.value) });
+            }
+        });
+        
+        // System Prompt changes
+        let systemPromptTimeout;
+        document.getElementById('systemPrompt').addEventListener('input', (e) => {
+            // Debounce system prompt updates
+            clearTimeout(systemPromptTimeout);
+            systemPromptTimeout = setTimeout(() => {
+                if (this.currentBin && e.target.value !== this.currentBin.systemPrompt) {
+                    this.updateBinSettings({ systemPrompt: e.target.value });
+                }
+            }, 1000); // Update after 1 second of no typing
         });
         
         // Token Controls
@@ -226,7 +575,9 @@ class TuneForgeUltimate {
         document.getElementById('userMessage').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                this.sendMessage();
+                if (!this.isGenerating) {
+                    this.sendMessage();
+                }
             }
         });
     }
@@ -271,14 +622,17 @@ class TuneForgeUltimate {
                 switch(e.key) {
                     case 'ArrowLeft':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.navigateLoom(-1);
                         break;
                     case 'ArrowRight':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.navigateLoom(1);
                         break;
                     case 'Enter':
                         e.preventDefault();
+                        e.stopPropagation();
                         this.selectLoomResponse();
                         break;
                 }
@@ -322,6 +676,10 @@ class TuneForgeUltimate {
         
         this.socket.on('responses', (data) => {
             this.handleResponses(data);
+            // Reset generation state for Socket.io
+            this.isGenerating = false;
+            this.activeRequestId = null;
+            this.enableGenerationUI();
         });
         
         this.socket.on('saved-prompts', (prompts) => {
@@ -333,13 +691,26 @@ class TuneForgeUltimate {
             console.error('Socket error:', error);
             this.showNotification(error.message || 'An error occurred', 'error');
         });
+        
+        // Presence tracking
+        this.socket.on('user-joined', (data) => {
+            this.handleUserJoined(data);
+        });
+        
+        this.socket.on('user-left', (data) => {
+            this.handleUserLeft(data);
+        });
+        
+        this.socket.on('active-users', (users) => {
+            this.updateActiveUsers(users);
+        });
     }
     
     // Bin Management Methods
     async loadBins() {
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`);
                 const data = await response.json();
                 this.bins = data.bins || [];
                 this.renderBinList();
@@ -423,13 +794,18 @@ class TuneForgeUltimate {
     
     async loadConversationsForBin(binId) {
         const convList = document.getElementById(`convList-${binId}`);
+        if (!convList) {
+            console.error(`Conversation list not found for bin ${binId}`);
+            return;
+        }
+        
         convList.innerHTML = '<div class="loading-state">Loading conversations...</div>';
         
         let conversations = [];
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations?binId=${binId}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${binId}`);
                 const data = await response.json();
                 conversations = data.conversations || [];
             } catch (error) {
@@ -443,6 +819,18 @@ class TuneForgeUltimate {
             conversations = allConvs.filter(c => c.binId === binId);
         }
         
+        // Merge with any placeholders for this bin
+        const placeholders = this.conversations.filter(c => 
+            c.binId === binId && 
+            c.metadata?.isPlaceholder && 
+            !conversations.find(conv => conv.name === c.name)
+        );
+        
+        conversations = [...placeholders, ...conversations];
+        
+        // Sort conversations by creation date (newest first)
+        conversations.sort((a, b) => new Date(b.metadata.createdAt) - new Date(a.metadata.createdAt));
+        
         convList.innerHTML = '';
         
         if (conversations.length === 0) {
@@ -454,6 +842,18 @@ class TuneForgeUltimate {
             const convEl = document.createElement('div');
             convEl.className = 'conversation-file';
             convEl.dataset.conversationId = conv.id; // Add data attribute for easier lookup
+            
+            // Add new-conversation class for placeholders or just-created conversations
+            if (conv.metadata?.isPlaceholder || 
+                (conv.metadata?.createdAt && new Date(conv.metadata.createdAt) > new Date(Date.now() - 5000))) {
+                convEl.classList.add('new-conversation');
+            }
+            
+            // If this is the current conversation, mark it as current
+            if (conv.id === this.currentConversationId || 
+                (conv.metadata?.isPlaceholder && conv.name === this.currentConversationName)) {
+                convEl.classList.add('current');
+            }
             
             const displayName = conv.name || this.getConversationPreview(conv);
             const date = new Date(conv.metadata.createdAt);
@@ -481,15 +881,37 @@ class TuneForgeUltimate {
                 this.loadConversation(conv);
             });
             convList.appendChild(convEl);
+            
+            // Highlight if this is the current conversation
+            if (conv.id === this.currentConversationId) {
+                convEl.classList.add('current');
+                // Flash animation for new conversations
+                convEl.classList.add('new-conversation');
+                setTimeout(() => convEl.classList.remove('new-conversation'), 1000);
+            }
         });
     }
     
     async selectBin(bin, skipNewConversation = false) {
+        // Stop tracking previous bin/conversation
+        await this.stopPresenceTracking();
+        
         this.currentBin = bin;
         
         // Update UI
         document.getElementById('currentBinName').textContent = bin.name;
-        document.getElementById('systemPrompt').value = bin.systemPrompt;
+        
+        // Only set system prompt and temperature if we're not loading a specific conversation
+        // This prevents overriding conversation-specific values
+        if (!skipNewConversation && !this.currentConversationId) {
+            document.getElementById('systemPrompt').value = bin.systemPrompt;
+            
+            // Load bin's default temperature if available
+            if (bin.defaultTemperature !== undefined) {
+                document.getElementById('temperature').value = bin.defaultTemperature;
+                document.getElementById('temperatureValue').textContent = bin.defaultTemperature;
+            }
+        }
         
         // Show bin-specific UI
         document.querySelector('.app-container').classList.remove('no-bin-selected');
@@ -514,9 +936,22 @@ class TuneForgeUltimate {
             }
         }, 100);
         
+        // Start polling for presence in this bin
+        if (this.isCloudflare) {
+            // Just start the polling interval for bin presence
+            if (this.presencePollingInterval) {
+                clearInterval(this.presencePollingInterval);
+            }
+            this.presencePollingInterval = setInterval(() => {
+                this.pollPresenceForBin();
+            }, 5000);
+            // Initial poll
+            this.pollPresenceForBin();
+        }
+        
         // Start new conversation only if not loading a specific conversation
         if (!skipNewConversation) {
-            this.clearConversation();
+            await this.clearConversation();
         }
     }
     
@@ -525,7 +960,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations?binId=${this.currentBin.id}`);
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations?binId=${this.currentBin.id}`);
                 const data = await response.json();
                 this.conversations = data.conversations || [];
                 this.updateStats();
@@ -546,12 +981,22 @@ class TuneForgeUltimate {
     }
     
     async createBin() {
-        const name = document.getElementById('binName').value.trim();
-        const systemPrompt = document.getElementById('binSystemPrompt').value.trim();
-        const description = document.getElementById('binDescription').value.trim();
+        const nameInput = document.getElementById('binName').value;
+        const systemPromptInput = document.getElementById('binSystemPrompt').value;
+        const descriptionInput = document.getElementById('binDescription').value;
         
-        if (!name || !systemPrompt) {
-            alert('Name and system prompt are required');
+        // Validate inputs
+        let name, systemPrompt, description;
+        try {
+            name = this.validateInput(nameInput, 'binName');
+            systemPrompt = this.validateInput(systemPromptInput, 'systemPrompt');
+            description = this.sanitizeInput(descriptionInput);
+            
+            if (!name || !systemPrompt) {
+                throw new Error('Name and system prompt are required');
+            }
+        } catch (error) {
+            this.showNotification(error.message, 'error');
             return;
         }
         
@@ -561,14 +1006,14 @@ class TuneForgeUltimate {
             systemPrompt,
             description,
             createdAt: new Date().toISOString(),
-            conversationCount: 0
+            conversationCount: 0,
+            defaultTemperature: parseFloat(document.getElementById('temperature').value)
         };
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bin)
                 });
                 
@@ -601,21 +1046,67 @@ class TuneForgeUltimate {
         document.getElementById('binDescription').value = '';
     }
     
+    async updateBinSettings(updates) {
+        if (!this.currentBin) return;
+        
+        // Update local bin object
+        Object.assign(this.currentBin, updates);
+        
+        if (this.isCloudflare) {
+            try {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-auth/${this.currentBin.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updates)
+                });
+                
+                if (response.ok) {
+                    const updatedBin = await response.json();
+                    // Update local bin with server response
+                    const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+                    if (binIndex > -1) {
+                        this.bins[binIndex] = updatedBin;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to update bin settings:', error);
+            }
+        } else {
+            // Local storage mode
+            const binIndex = this.bins.findIndex(b => b.id === this.currentBin.id);
+            if (binIndex > -1) {
+                this.bins[binIndex] = this.currentBin;
+                localStorage.setItem('tuneforge_bins', JSON.stringify(this.bins));
+            }
+        }
+    }
+    
     async deleteBin() {
         if (!this.currentBin) {
             console.log('No bin selected to delete');
             return;
         }
         
-        if (!confirm(`Delete bin "${this.currentBin.name}" and all its conversations?`)) {
-            return;
-        }
+        // Count conversations in this bin
+        const convCount = this.conversations.length;
+        const turnCount = this.conversations.reduce((sum, conv) => 
+            sum + (conv.metadata?.turnCount || 0), 0);
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Delete Bin',
+            message: `Delete "${this.currentBin.name}"?`,
+            details: `This will permanently delete ${convCount} conversation${convCount !== 1 ? 's' : ''} with ${turnCount} total turns.`,
+            confirmText: 'DELETE',
+            dangerous: true
+        });
+        
+        if (!confirmed) return;
         
         console.log('Deleting bin:', this.currentBin.id);
+        this.showLoadingOverlay('Deleting bin...');
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/bins/${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins/${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -635,6 +1126,8 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Failed to delete bin:', error);
                 this.showNotification('Failed to delete bin', 'error');
+            } finally {
+                this.hideLoadingOverlay();
             }
         } else {
             // Local storage mode
@@ -699,10 +1192,12 @@ class TuneForgeUltimate {
             this.availableModels = [
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
-                { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
-                { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
+                { id: 'o3-pro-2025-04-16', name: 'GPT-o3-pro', provider: 'openai' },
+                { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
-                { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.5 Flash', provider: 'google' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' },
+                { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
+                { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
                 { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
             ];
         } else {
@@ -715,6 +1210,21 @@ class TuneForgeUltimate {
     renderModelSelection() {
         const container = document.getElementById('modelSelection');
         container.innerHTML = '';
+        
+        // Load saved model selection from localStorage
+        const savedModels = localStorage.getItem('tuneforge_selected_models');
+        if (savedModels) {
+            try {
+                this.selectedModels = JSON.parse(savedModels);
+                // Filter out models that are no longer available
+                this.selectedModels = this.selectedModels.filter(modelId => 
+                    this.availableModels.some(m => m.id === modelId)
+                );
+            } catch (e) {
+                console.warn('Failed to load saved model selection:', e);
+                this.selectedModels = [];
+            }
+        }
         
         this.availableModels.forEach(model => {
             const modelEl = document.createElement('div');
@@ -733,6 +1243,8 @@ class TuneForgeUltimate {
         });
         
         this.updateModelCount();
+        // Update UI to reflect loaded selection
+        this.updateModelSelectionUI();
     }
     
     toggleModel(modelId) {
@@ -742,6 +1254,9 @@ class TuneForgeUltimate {
         } else {
             this.selectedModels.push(modelId);
         }
+        
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
         
         // Update UI
         const modelEl = document.querySelector(`[data-model-id="${modelId}"]`);
@@ -754,6 +1269,8 @@ class TuneForgeUltimate {
     
     selectAllModels() {
         this.selectedModels = this.availableModels.map(m => m.id);
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
         document.querySelectorAll('.model-option').forEach(el => {
             el.classList.add('selected');
         });
@@ -764,12 +1281,67 @@ class TuneForgeUltimate {
         document.getElementById('modelCount').textContent = this.selectedModels.length;
     }
     
+    updateModelSelectionUI() {
+        // Update all model option elements to reflect current selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            const modelId = el.dataset.modelId;
+            if (this.selectedModels.includes(modelId)) {
+                el.classList.add('selected');
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+        
+        // Also save to localStorage for consistency
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
+    }
+    
     // Conversation Management
-    loadConversation(conversation) {
+    async loadConversation(conversation) {
+        console.log('[DEBUG] Loading conversation:', conversation.id);
+        console.log('[DEBUG] Conversation metadata:', conversation.metadata);
+        
+        // Stop tracking previous conversation
+        await this.stopPresenceTracking();
+        
+        // Clear any active loom from previous conversation
+        this.activeLoom = null;
+        
         // Set current conversation details
         this.currentConversationId = conversation.id;
         this.currentConversationName = conversation.name || this.getConversationPreview(conversation);
         this.currentConversationDescription = conversation.description || '';
+        
+        // Extract and set system prompt from conversation
+        const systemMessage = conversation.messages.find(m => m.role === 'system');
+        if (systemMessage) {
+            document.getElementById('systemPrompt').value = systemMessage.content;
+            console.log('[DEBUG] Loaded system prompt:', systemMessage.content);
+        }
+        
+        // Load temperature from conversation metadata if available
+        if (conversation.metadata?.temperature !== undefined) {
+            document.getElementById('temperature').value = conversation.metadata.temperature;
+            document.getElementById('temperatureValue').textContent = conversation.metadata.temperature;
+            console.log('[DEBUG] Loaded temperature:', conversation.metadata.temperature);
+        }
+        
+        // Load maxTokens from conversation metadata if available
+        if (conversation.metadata?.maxTokens !== undefined) {
+            document.getElementById('maxTokensValue').textContent = conversation.metadata.maxTokens;
+            console.log('[DEBUG] Loaded maxTokens:', conversation.metadata.maxTokens);
+        }
+        
+        // Load models from conversation metadata if available
+        if (conversation.metadata?.models && Array.isArray(conversation.metadata.models)) {
+            this.selectedModels = conversation.metadata.models.filter(modelId => 
+                this.availableModels.some(m => m.id === modelId)
+            );
+            // Update model selection UI
+            this.updateModelSelectionUI();
+            this.updateModelCount();
+            console.log('[DEBUG] Loaded models:', this.selectedModels);
+        }
         
         // Load conversation into the UI
         this.currentMessages = conversation.messages.filter(m => m.role !== 'system');
@@ -796,6 +1368,9 @@ class TuneForgeUltimate {
         
         // Focus input for continuation
         document.getElementById('userMessage').focus();
+        
+        // Start presence tracking for new conversation
+        await this.startPresenceTracking();
         
         this.showNotification('Conversation loaded');
     }
@@ -938,6 +1513,7 @@ class TuneForgeUltimate {
         this.currentConversationId = null;
         this.currentConversationName = nameInput;
         this.currentConversationDescription = description;
+        this.activeLoom = null; // Clear any existing loom
         
         document.getElementById('conversationFlow').innerHTML = `
             <div class="empty-state">
@@ -952,6 +1528,37 @@ class TuneForgeUltimate {
         document.getElementById('userMessage').value = '';
         
         this.updateConversationNameDisplay();
+        
+        // Create a placeholder conversation that will show in the bin immediately
+        const placeholderConv = {
+            id: 'temp_' + Date.now(),
+            binId: this.currentBin.id,
+            name: nameInput,
+            description: description,
+            messages: [],
+            metadata: {
+                createdAt: new Date().toISOString(),
+                turnCount: 0,
+                isPlaceholder: true
+            }
+        };
+        
+        // Add to conversations array temporarily
+        this.conversations.push(placeholderConv);
+        
+        // Update bin count and refresh the list to show the new conversation
+        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+        this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+        
+        // Ensure bin is expanded and refresh list
+        const convList = document.getElementById(`convList-${this.currentBin.id}`);
+        if (convList) {
+            if (convList.style.display === 'none') {
+                await this.toggleBinExpanded(this.currentBin.id);
+            } else {
+                await this.loadConversationsForBin(this.currentBin.id);
+            }
+        }
         
         // Close modal
         document.getElementById('newConversationModal').classList.remove('active');
@@ -969,7 +1576,13 @@ class TuneForgeUltimate {
         this.showNewConversationModal();
     }
     
-    clearConversation() {
+    async clearConversation() {
+        // Stop presence tracking
+        await this.stopPresenceTracking();
+        
+        // Clear any active loom
+        this.activeLoom = null;
+        
         // Clear conversation without showing modal (used internally)
         this.currentMessages = [];
         this.currentConversationId = null;
@@ -992,22 +1605,86 @@ class TuneForgeUltimate {
     }
     
     async sendMessage() {
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
+        
+        // Check if there's an active loom (unselected responses)
+        if (this.activeLoom) {
+            this.showNotification('Please select a response before sending a new message', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Pulse the loom to draw attention
+                loomElement.style.animation = 'none';
+                setTimeout(() => {
+                    loomElement.style.animation = 'loomPulse 0.5s ease-out';
+                }, 10);
+            }
+            return;
+        }
+        
         if (!this.currentBin) {
             alert('Please select a bin first');
             return;
         }
         
-        const message = document.getElementById('userMessage').value.trim();
-        if (!message) return;
+        const messageInput = document.getElementById('userMessage').value;
         
-        if (this.selectedModels.length === 0) {
-            alert('Please select at least one model');
+        // Validate and sanitize input
+        let message;
+        try {
+            message = this.validateInput(messageInput, 'message');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
             return;
         }
+        
+        if (this.selectedModels.length === 0) {
+            this.showNotification('Please select at least one model', 'warning');
+            return;
+        }
+        
+        // Check rate limit
+        try {
+            this.checkRateLimit('generate');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+            return;
+        }
+        
+        // Save message to temporary storage in case of failure
+        const messageBackup = {
+            content: message,
+            timestamp: Date.now(),
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId
+        };
+        sessionStorage.setItem('tuneforge_pending_message', JSON.stringify(messageBackup));
+        
+        // Set generating flag and disable UI
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        this.disableGenerationUI();
+        
+        // Log message state for debugging
+        console.log('[TuneForge] Sending message:', {
+            messageIndex: this.currentMessages.length,
+            content: message.substring(0, 50) + '...',
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId,
+            timestamp: new Date().toISOString()
+        });
         
         // Add user message
         this.currentMessages.push({ role: 'user', content: message });
         this.addMessageToUI({ role: 'user', content: message });
+        
+        // Save to session storage after adding user message
+        this.saveConversationToSessionStorage();
         
         // Clear input
         document.getElementById('userMessage').value = '';
@@ -1044,18 +1721,67 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             // Cloudflare API call
+            const currentRequestId = this.activeRequestId;
             try {
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
-                const data = await response.json();
-                this.handleResponses({ responses: data.responses });
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
+                
+                // Check response status first
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+                
+                // Try to parse JSON with error handling
+                let data;
+                const responseText = await response.text();
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('Failed to parse API response:', responseText);
+                    throw new Error('Invalid response format from API');
+                }
+                
+                this.handleResponses({ responses: data.responses || [] });
             } catch (error) {
                 console.error('Failed to generate responses:', error);
-                this.showNotification('Failed to generate responses', 'error');
+                this.showNotification('Failed to generate responses - your message has been saved', 'error');
+                
+                // Log error details for debugging
+                console.error('[TuneForge] Response generation failed:', {
+                    error: error.message,
+                    messageCount: this.currentMessages.length,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Remove loading state
+                const flow = document.getElementById('conversationFlow');
+                const loadingEl = flow.querySelector('.loading-loom');
+                if (loadingEl) loadingEl.remove();
+                
+                // Add error indicator to the last message
+                const lastMessageBlock = flow.lastElementChild;
+                if (lastMessageBlock && !lastMessageBlock.querySelector('.message-error')) {
+                    const errorIndicator = document.createElement('div');
+                    errorIndicator.className = 'message-error';
+                    errorIndicator.innerHTML = '⚠ Failed to generate response - message saved';
+                    lastMessageBlock.appendChild(errorIndicator);
+                }
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    this.enableGenerationUI();
+                }
             }
         } else {
             // Socket.io emit
@@ -1087,6 +1813,11 @@ class TuneForgeUltimate {
         
         flow.appendChild(messageEl);
         flow.scrollTop = flow.scrollHeight;
+        
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            this.loom.addLoomIcons();
+        }
     }
     
     showLoomLoading() {
@@ -1103,20 +1834,44 @@ class TuneForgeUltimate {
     }
     
     handleResponses(data) {
+        // Reset generation state
+        this.isGenerating = false;
+        this.activeRequestId = null;
+        this.enableGenerationUI();
+        
+        // Log response handling for debugging
+        console.log('[TuneForge] Handling responses:', {
+            responseCount: data.responses?.length || 0,
+            messageCount: this.currentMessages.length,
+            timestamp: new Date().toISOString()
+        });
+        
         const flow = document.getElementById('conversationFlow');
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
         if (!data.responses || data.responses.length === 0) {
-            this.showNotification('No responses generated', 'error');
+            this.showNotification('No responses generated - your message has been saved', 'error');
+            
+            // Add recovery option
+            const recoveryEl = document.createElement('div');
+            recoveryEl.className = 'message-recovery';
+            recoveryEl.innerHTML = `
+                <button class="btn-recovery" onclick="app.retryLastMessage()">↻ Retry</button>
+                <button class="btn-recovery" onclick="app.removeLastMessage()">✕ Remove</button>
+            `;
+            flow.appendChild(recoveryEl);
             return;
         }
+        
+        // Clear pending message backup on successful response
+        sessionStorage.removeItem('tuneforge_pending_message');
         
         // Create loom
         const loomEl = document.createElement('div');
         loomEl.className = 'message-block';
         loomEl.innerHTML = `
-            <div class="completion-loom">
+            <div class="completion-loom" tabindex="0">
                 <div class="completion-header">
                     <div class="completion-title">ASSISTANT RESPONSES</div>
                     <div class="completion-nav">
@@ -1146,11 +1901,45 @@ class TuneForgeUltimate {
         this.activeLoom = {
             element: loomEl,
             responses: data.responses,
-            currentIndex: 0
+            currentIndex: 0,
+            createdAt: Date.now()
         };
+        
+        // Log unselected loom for debugging
+        console.log('[TuneForge] Loom created with responses:', {
+            responseCount: data.responses.length,
+            models: data.responses.map(r => r.model),
+            messageCount: this.currentMessages.length,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Save pending loom to session storage
+        const pendingLoom = {
+            responses: data.responses,
+            messageCountBeforeLoom: this.currentMessages.length,
+            createdAt: Date.now()
+        };
+        sessionStorage.setItem('tuneforge_pending_loom', JSON.stringify(pendingLoom));
+        
+        // Focus the loom for keyboard navigation
+        const loomElement = loomEl.querySelector('.completion-loom');
+        if (loomElement) {
+            setTimeout(() => loomElement.focus(), 100);
+        }
+        
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            setTimeout(() => this.loom.addLoomIcons(), 100);
+        }
         
         // Enable save button
         document.getElementById('saveConversation').disabled = false;
+        
+        // Auto-save conversation state periodically
+        if (this.currentMessages.length > 0 && this.currentMessages.length % 4 === 0) {
+            console.log('[TuneForge] Auto-saving conversation state');
+            this.saveConversation(true);
+        }
     }
     
     createCompletionCard(response, index) {
@@ -1196,13 +1985,13 @@ class TuneForgeUltimate {
                         <div class="regen-section">
                             <h4>CORE PARAMETERS</h4>
                             <div class="control-group">
-                                <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${response.temperature || 0.7}</span></label>
-                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${response.temperature || 0.7}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
+                                <label>Temperature <span class="value-display" id="regen-temp-val-${index}">${document.getElementById('temperature').value}</span></label>
+                                <input type="range" id="regen-temp-${index}" min="0" max="2" step="0.1" value="${document.getElementById('temperature').value}" oninput="document.getElementById('regen-temp-val-${index}').textContent = this.value">
                                 <span class="param-help">Randomness (0=deterministic, 2=creative)</span>
                             </div>
                             <div class="control-group">
                                 <label>Max Tokens</label>
-                                <input type="number" id="regen-tokens-${index}" min="100" max="8000" value="${response.maxTokens || 1000}" class="token-input">
+                                <input type="number" id="regen-tokens-${index}" min="100" max="8000" value="${document.getElementById('maxTokensValue').textContent}" class="token-input">
                                 <span class="param-help">Maximum response length</span>
                             </div>
                         </div>
@@ -1306,12 +2095,24 @@ class TuneForgeUltimate {
         const response = this.activeLoom.responses[index];
         if (!response || response.error) return;
         
+        // Log selection for debugging
+        console.log('[TuneForge] Selecting response:', {
+            index,
+            model: response.model,
+            messageCount: this.currentMessages.length,
+            conversationId: this.currentConversationId,
+            timestamp: new Date().toISOString()
+        });
+        
         // Add to messages
         this.currentMessages.push({
             role: 'assistant',
             content: response.content,
             model: response.model
         });
+        
+        // Save to session storage immediately for recovery
+        this.saveConversationToSessionStorage();
         
         // Replace loom with message
         const messageEl = document.createElement('div');
@@ -1326,7 +2127,16 @@ class TuneForgeUltimate {
         this.activeLoom.element.replaceWith(messageEl);
         this.activeLoom = null;
         
+        // Update loom icons if loom is initialized
+        if (this.loom) {
+            setTimeout(() => this.loom.addLoomIcons(), 100);
+        }
+        
+        // Clear pending loom from session storage
+        sessionStorage.removeItem('tuneforge_pending_loom');
+        
         // Auto-save the conversation after selecting a response
+        console.log('[TuneForge] Auto-saving after response selection');
         this.saveConversation(true);
         
         // Focus input for next message
@@ -1418,10 +2228,13 @@ class TuneForgeUltimate {
     }
     
     resetRegenSettings(index) {
-        // Reset all settings to defaults
-        document.getElementById(`regen-temp-${index}`).value = 0.7;
-        document.getElementById(`regen-temp-val-${index}`).textContent = '0.7';
-        document.getElementById(`regen-tokens-${index}`).value = 1000;
+        // Reset all settings to current UI values
+        const currentTemp = document.getElementById('temperature').value;
+        const currentMaxTokens = document.getElementById('maxTokensValue').textContent;
+        
+        document.getElementById(`regen-temp-${index}`).value = currentTemp;
+        document.getElementById(`regen-temp-val-${index}`).textContent = currentTemp;
+        document.getElementById(`regen-tokens-${index}`).value = currentMaxTokens;
         document.getElementById(`regen-top-p-${index}`).value = 1.0;
         document.getElementById(`regen-top-p-val-${index}`).textContent = '1.0';
         document.getElementById(`regen-freq-${index}`).value = 0;
@@ -1432,11 +2245,17 @@ class TuneForgeUltimate {
         document.getElementById(`regen-instructions-${index}`).value = '';
         document.getElementById(`regen-variations-${index}`).value = '1';
         
-        this.showNotification('Settings reset to defaults');
+        this.showNotification('Settings reset to current values');
     }
     
     async regenerateSingle(index) {
         if (!this.activeLoom || !this.activeLoom.responses[index]) return;
+        
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
         
         const response = this.activeLoom.responses[index];
         const temperature = parseFloat(document.getElementById(`regen-temp-${index}`).value);
@@ -1449,10 +2268,16 @@ class TuneForgeUltimate {
         // Close the menu
         this.closeRegenMenu(index);
         
+        // Set generating flag
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        
         // Show loading state on this card
         const card = document.querySelector(`.completion-card[data-index="${index}"]`);
         if (!card) {
             console.error('Card not found for index:', index);
+            this.isGenerating = false;
+            this.activeRequestId = null;
             return;
         }
         card.classList.add('regenerating');
@@ -1468,6 +2293,7 @@ class TuneForgeUltimate {
         }
         
         if (this.isCloudflare) {
+            const currentRequestId = this.activeRequestId;
             try {
                 // Prepare model-specific parameters
                 const generateParams = {
@@ -1489,11 +2315,16 @@ class TuneForgeUltimate {
                     generateParams.maxTokens = maxTokens;
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
+                
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
                 
                 const data = await response.json();
                 if (data.responses && data.responses[0]) {
@@ -1513,6 +2344,13 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Regeneration failed:', error);
                 this.showNotification('Failed to regenerate response', 'error');
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    card.classList.remove('regenerating');
+                }
             }
         } else {
             // Socket.io mode
@@ -1527,9 +2365,15 @@ class TuneForgeUltimate {
                 maxTokens,
                 isSingleRegeneration: true
             });
+            
+            // For Socket.io, we'll reset the state when we receive the response
+            // But still remove the regenerating class
+            setTimeout(() => {
+                card.classList.remove('regenerating');
+                this.isGenerating = false;
+                this.activeRequestId = null;
+            }, 100);
         }
-        
-        card.classList.remove('regenerating');
     }
     
     updateCompletionCard(index) {
@@ -1572,9 +2416,18 @@ class TuneForgeUltimate {
                 updatedAt: new Date().toISOString(),
                 turnCount: Math.floor(this.currentMessages.length / 2),
                 models: this.selectedModels,
-                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model
+                lastModel: this.currentMessages[this.currentMessages.length - 1]?.model,
+                temperature: parseFloat(document.getElementById('temperature').value),
+                maxTokens: parseInt(document.getElementById('maxTokensValue').textContent)
             }
         };
+        
+        console.log('[DEBUG] Saving conversation with metadata:', {
+            temperature: conversation.metadata.temperature,
+            maxTokens: conversation.metadata.maxTokens,
+            models: conversation.metadata.models,
+            systemPrompt: conversation.messages[0].content
+        });
         
         if (this.isCloudflare) {
             try {
@@ -1582,9 +2435,8 @@ class TuneForgeUltimate {
                     ? `${this.apiBase}/conversations`
                     : `${this.apiBase}/conversations/${conversationId}`;
                     
-                const response = await fetch(endpoint, {
+                const response = await this.fetchWithAuth(endpoint, {
                     method: isNewConversation ? 'POST' : 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(conversation)
                 });
                 
@@ -1593,8 +2445,21 @@ class TuneForgeUltimate {
                     
                     if (isNewConversation) {
                         this.currentConversationId = savedConv.id;
-                        this.conversations.push(savedConv);
-                        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                        
+                        // Remove placeholder if it exists
+                        const placeholderIndex = this.conversations.findIndex(c => 
+                            c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                        );
+                        if (placeholderIndex > -1) {
+                            // Replace placeholder with real conversation
+                            this.conversations[placeholderIndex] = savedConv;
+                            // Don't increment count since we already did when creating placeholder
+                        } else {
+                            // No placeholder, this is a direct save
+                            this.conversations.push(savedConv);
+                            this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                        }
+                        
                         // Enable delete button for new conversation
                         document.getElementById('deleteConversation').disabled = false;
                     } else {
@@ -1610,8 +2475,17 @@ class TuneForgeUltimate {
                     // Update the conversation in the UI
                     if (this.currentBin) {
                         if (isNewConversation) {
-                            // For new conversations, reload the list to add it
-                            await this.loadConversationsForBin(this.currentBin.id);
+                            // Update bin count in UI immediately
+                            this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                            
+                            // Ensure bin is expanded to show new conversation
+                            const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                            if (convList && convList.style.display === 'none') {
+                                await this.toggleBinExpanded(this.currentBin.id);
+                            } else {
+                                // For new conversations, reload the list to add it
+                                await this.loadConversationsForBin(this.currentBin.id);
+                            }
                         } else {
                             // For existing conversations, just update the name and turn count
                             this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
@@ -1637,8 +2511,21 @@ class TuneForgeUltimate {
             if (isNewConversation) {
                 this.currentConversationId = conversationId;
                 allConvs.push(conversation);
-                this.conversations.push(conversation);
-                this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                
+                // Remove placeholder if it exists
+                const placeholderIndex = this.conversations.findIndex(c => 
+                    c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                );
+                if (placeholderIndex > -1) {
+                    // Replace placeholder with real conversation
+                    this.conversations[placeholderIndex] = conversation;
+                    // Don't increment count since we already did when creating placeholder
+                } else {
+                    // No placeholder, this is a direct save
+                    this.conversations.push(conversation);
+                    this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                }
+                
                 // Enable delete button for new conversation
                 document.getElementById('deleteConversation').disabled = false;
             } else {
@@ -1668,8 +2555,17 @@ class TuneForgeUltimate {
             // Update the conversation in the UI
             if (this.currentBin) {
                 if (isNewConversation) {
-                    // For new conversations, reload the list to add it
-                    await this.loadConversationsForBin(this.currentBin.id);
+                    // Update bin count in UI immediately
+                    this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                    
+                    // Ensure bin is expanded to show new conversation
+                    const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                    if (convList && convList.style.display === 'none') {
+                        await this.toggleBinExpanded(this.currentBin.id);
+                    } else {
+                        // For new conversations, reload the list to add it
+                        await this.loadConversationsForBin(this.currentBin.id);
+                    }
                 } else {
                     // For existing conversations, just update the name and turn count
                     this.updateConversationNameInLists(conversationId, conversation.name || this.currentConversationName);
@@ -1691,13 +2587,21 @@ class TuneForgeUltimate {
         }
         
         const conversationName = this.currentConversationName || 'this conversation';
-        if (!confirm(`Delete "${conversationName}"? This cannot be undone.`)) {
-            return;
-        }
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Delete Conversation',
+            message: `Delete "${conversationName}"?`,
+            details: `This conversation has ${turnCount} turn${turnCount !== 1 ? 's' : ''} and will be permanently deleted.`,
+            confirmText: 'DELETE',
+            dangerous: true
+        });
+        
+        if (!confirmed) return;
         
         if (this.isCloudflare) {
             try {
-                const response = await fetch(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/conversations/${this.currentConversationId}?binId=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -1787,12 +2691,23 @@ class TuneForgeUltimate {
     
     // Regeneration
     async regenerateAll() {
+        // Prevent duplicate calls
+        if (this.isGenerating) {
+            this.showNotification('Please wait for the current request to complete', 'warning');
+            return;
+        }
+        
         // Find the last assistant message
         const lastAssistantIndex = this.currentMessages.findLastIndex(m => m.role === 'assistant');
         if (lastAssistantIndex === -1) {
             this.showNotification('No assistant message to regenerate', 'error');
             return;
         }
+        
+        // Set generating flag
+        this.isGenerating = true;
+        this.activeRequestId = Date.now().toString();
+        this.disableGenerationUI();
         
         // Get messages up to (but not including) the last assistant message
         const messagesToSend = this.currentMessages.slice(0, lastAssistantIndex);
@@ -1834,6 +2749,7 @@ class TuneForgeUltimate {
         
         // Regenerate with all selected models
         if (this.isCloudflare) {
+            const currentRequestId = this.activeRequestId;
             try {
                 const generateParams = {
                     binId: this.currentBin.id,
@@ -1854,11 +2770,16 @@ class TuneForgeUltimate {
                     generateParams.maxTokens = maxTokens;
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
+                
+                // Check if this is still the active request
+                if (this.activeRequestId !== currentRequestId) {
+                    console.warn('Request cancelled - newer request in progress');
+                    return;
+                }
                 
                 const data = await response.json();
                 this.handleResponses({ responses: data.responses });
@@ -1869,6 +2790,13 @@ class TuneForgeUltimate {
                 // Remove loading loom
                 const loadingLoom = flow.querySelector('.loading-loom');
                 if (loadingLoom) loadingLoom.remove();
+            } finally {
+                // Only reset if this is still the active request
+                if (this.activeRequestId === currentRequestId) {
+                    this.isGenerating = false;
+                    this.activeRequestId = null;
+                    this.enableGenerationUI();
+                }
             }
         } else {
             // Socket.io mode
@@ -1935,9 +2863,8 @@ class TuneForgeUltimate {
                     Object.assign(generateParams, params);
                 }
                 
-                const response = await fetch(`${this.apiBase}/generate`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generateParams)
                 });
                 
@@ -2101,6 +3028,38 @@ class TuneForgeUltimate {
         document.getElementById('qualityScore').textContent = qualityScore + '%';
     }
     
+    updateBinCount(binId, count) {
+        // Update the bin count display immediately
+        const binEl = document.querySelector(`[data-bin-id="${binId}"]`);
+        if (binEl) {
+            const countEl = binEl.querySelector('.bin-count');
+            if (countEl) {
+                countEl.textContent = count;
+            }
+        }
+        
+        // Also update in the bins list
+        const binIndex = this.bins.findIndex(b => b.id === binId);
+        if (binIndex > -1) {
+            this.bins[binIndex].conversationCount = count;
+        }
+    }
+    
+    updateConversationNameInLists(conversationId, newName) {
+        // Update name in all conversation lists
+        const nameElements = document.querySelectorAll(`[data-conv-name="${conversationId}"]`);
+        nameElements.forEach(el => {
+            el.textContent = newName;
+        });
+        
+        // Also update any conversation items with this ID
+        const convItems = document.querySelectorAll(`[data-conversation-id="${conversationId}"]`);
+        convItems.forEach(item => {
+            const nameEl = item.querySelector('.file-name');
+            if (nameEl) nameEl.textContent = newName;
+        });
+    }
+    
     // Prompt Management
     async loadSavedPrompts() {
         if (this.isCloudflare) {
@@ -2201,14 +3160,745 @@ class TuneForgeUltimate {
         return div.innerHTML;
     }
     
+    // Periodic saves
+    startPeriodicSaves() {
+        // Save every 30 seconds if there's an active conversation
+        this.periodicSaveInterval = setInterval(() => {
+            if (this.currentMessages.length > 0) {
+                this.saveConversationToSessionStorage();
+            }
+        }, 30000);
+    }
+    
+    stopPeriodicSaves() {
+        if (this.periodicSaveInterval) {
+            clearInterval(this.periodicSaveInterval);
+            this.periodicSaveInterval = null;
+        }
+    }
+    
+    // Session storage methods for recovery
+    saveConversationToSessionStorage() {
+        if (!this.currentBin || !this.currentMessages.length) return;
+        
+        const recoveryData = {
+            binId: this.currentBin.id,
+            conversationId: this.currentConversationId,
+            conversationName: this.currentConversationName,
+            conversationDescription: this.currentConversationDescription,
+            messages: this.currentMessages,
+            systemPrompt: document.getElementById('systemPrompt').value,
+            timestamp: Date.now()
+        };
+        
+        sessionStorage.setItem('tuneforge_conversation_recovery', JSON.stringify(recoveryData));
+        console.log('[TuneForge] Saved conversation to session storage for recovery');
+    }
+    
+    checkForRecoveryData() {
+        const recoveryDataStr = sessionStorage.getItem('tuneforge_conversation_recovery');
+        if (!recoveryDataStr) return false;
+        
+        try {
+            const recoveryData = JSON.parse(recoveryDataStr);
+            const age = Date.now() - recoveryData.timestamp;
+            
+            // Only offer recovery if data is less than 1 hour old
+            if (age > 3600000) {
+                sessionStorage.removeItem('tuneforge_conversation_recovery');
+                return false;
+            }
+            
+            return recoveryData;
+        } catch (error) {
+            console.error('Failed to parse recovery data:', error);
+            sessionStorage.removeItem('tuneforge_conversation_recovery');
+            return false;
+        }
+    }
+    
+    async recoverConversation(recoveryData) {
+        console.log('[TuneForge] Recovering conversation:', {
+            binId: recoveryData.binId,
+            messageCount: recoveryData.messages.length,
+            age: Date.now() - recoveryData.timestamp
+        });
+        
+        // Select the bin
+        const bin = this.bins.find(b => b.id === recoveryData.binId);
+        if (bin) {
+            await this.selectBin(bin.id);
+        }
+        
+        // Restore messages
+        this.currentMessages = recoveryData.messages;
+        this.currentConversationId = recoveryData.conversationId;
+        this.currentConversationName = recoveryData.conversationName || '';
+        this.currentConversationDescription = recoveryData.conversationDescription || '';
+        
+        // Restore system prompt
+        if (recoveryData.systemPrompt) {
+            document.getElementById('systemPrompt').value = recoveryData.systemPrompt;
+        }
+        
+        // Rebuild UI
+        document.getElementById('conversationFlow').innerHTML = '';
+        this.currentMessages.forEach(msg => this.addMessageToUI(msg));
+        
+        // Update UI state
+        this.updateConversationNameDisplay();
+        document.getElementById('saveConversation').disabled = false;
+        document.getElementById('deleteConversation').disabled = !!this.currentConversationId;
+        
+        // Update turn count
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('turnCount').textContent = turnCount;
+        
+        this.showNotification('Conversation recovered from previous session', 'success');
+        
+        // Clear recovery data
+        sessionStorage.removeItem('tuneforge_conversation_recovery');
+    }
+    
+    // Enhanced confirmation dialog system
+    async showConfirmDialog(options) {
+        return new Promise((resolve) => {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                details = '',
+                confirmText = 'CONFIRM',
+                cancelText = 'CANCEL',
+                dangerous = false
+            } = options;
+            
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-overlay active';
+            
+            modal.innerHTML = `
+                <div class="confirm-modal ${dangerous ? 'dangerous' : ''}">
+                    <div class="confirm-header">
+                        <h3>${this.escapeHtml(title)}</h3>
+                        <div class="confirm-glow"></div>
+                    </div>
+                    <div class="confirm-body">
+                        <p class="confirm-message">${this.escapeHtml(message)}</p>
+                        ${details ? `<div class="confirm-details">${this.escapeHtml(details)}</div>` : ''}
+                    </div>
+                    <div class="confirm-actions">
+                        <button class="btn btn-cancel" id="confirmCancel">${cancelText}</button>
+                        <button class="btn btn-confirm ${dangerous ? 'btn-danger' : ''}" id="confirmOk">${confirmText}</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Focus confirm button for keyboard navigation
+            setTimeout(() => {
+                document.getElementById('confirmOk').focus();
+            }, 100);
+            
+            // Event handlers
+            const cleanup = () => {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            };
+            
+            const handleConfirm = () => {
+                cleanup();
+                resolve(true);
+            };
+            
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            
+            // Add event listeners
+            document.getElementById('confirmOk').addEventListener('click', handleConfirm);
+            document.getElementById('confirmCancel').addEventListener('click', handleCancel);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) handleCancel();
+            });
+            
+            // Keyboard shortcuts
+            const handleKeydown = (e) => {
+                if (e.key === 'Escape') handleCancel();
+                if (e.key === 'Enter') handleConfirm();
+            };
+            document.addEventListener('keydown', handleKeydown);
+            
+            // Cleanup keyboard listener when modal closes
+            modal.addEventListener('transitionend', () => {
+                if (!modal.classList.contains('active')) {
+                    document.removeEventListener('keydown', handleKeydown);
+                }
+            });
+        });
+    }
+    
+    // Loading overlay system
+    showLoadingOverlay(message = 'Processing...') {
+        // Remove any existing overlay
+        this.hideLoadingOverlay();
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'loading-overlay active';
+        overlay.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                </div>
+                <div class="loading-message">${this.escapeHtml(message)}</div>
+                <div class="loading-progress">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+    }
+    
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+        }
+    }
+    
+    // Rate limiting and validation
+    checkRateLimit(endpoint) {
+        const now = Date.now();
+        const key = `${endpoint}:${this.userId}`;
+        const timestamps = this.requestTimestamps.get(key) || [];
+        
+        // Remove old timestamps outside the window
+        const validTimestamps = timestamps.filter(ts => now - ts < this.rateLimitWindow);
+        
+        if (validTimestamps.length >= this.maxRequestsPerWindow) {
+            const oldestTimestamp = validTimestamps[0];
+            const waitTime = Math.ceil((this.rateLimitWindow - (now - oldestTimestamp)) / 1000);
+            throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds.`);
+        }
+        
+        // Add current timestamp
+        validTimestamps.push(now);
+        this.requestTimestamps.set(key, validTimestamps);
+        
+        return true;
+    }
+    
+    validateInput(input, type) {
+        // Sanitize input first
+        const sanitized = this.sanitizeInput(input);
+        
+        switch (type) {
+            case 'message':
+                if (sanitized.length > this.maxMessageLength) {
+                    throw new Error(`Message too long. Maximum ${this.maxMessageLength} characters allowed.`);
+                }
+                if (sanitized.trim().length === 0) {
+                    throw new Error('Message cannot be empty.');
+                }
+                break;
+                
+            case 'conversationName':
+                if (sanitized.length > this.maxConversationNameLength) {
+                    throw new Error(`Name too long. Maximum ${this.maxConversationNameLength} characters allowed.`);
+                }
+                if (!/^[\w\s\-\.]+$/.test(sanitized)) {
+                    throw new Error('Name can only contain letters, numbers, spaces, hyphens, and periods.');
+                }
+                break;
+                
+            case 'binName':
+                if (sanitized.length > this.maxBinNameLength) {
+                    throw new Error(`Name too long. Maximum ${this.maxBinNameLength} characters allowed.`);
+                }
+                if (!/^[\w\s\-\.]+$/.test(sanitized)) {
+                    throw new Error('Name can only contain letters, numbers, spaces, hyphens, and periods.');
+                }
+                break;
+                
+            case 'systemPrompt':
+                if (sanitized.length > this.maxSystemPromptLength) {
+                    throw new Error(`System prompt too long. Maximum ${this.maxSystemPromptLength} characters allowed.`);
+                }
+                break;
+        }
+        
+        return sanitized;
+    }
+    
+    sanitizeInput(input) {
+        if (typeof input !== 'string') return '';
+        
+        // Remove any potential script tags or HTML
+        return input
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+    }
+    
+    // Request queue management
+    async queueRequest(fn, priority = 0) {
+        return new Promise((resolve, reject) => {
+            this.requestQueue.push({ fn, resolve, reject, priority });
+            this.requestQueue.sort((a, b) => b.priority - a.priority);
+            
+            if (!this.processingQueue) {
+                this.processQueue();
+            }
+        });
+    }
+    
+    async processQueue() {
+        if (this.processingQueue || this.requestQueue.length === 0) return;
+        
+        this.processingQueue = true;
+        
+        while (this.requestQueue.length > 0) {
+            const { fn, resolve, reject } = this.requestQueue.shift();
+            
+            try {
+                const result = await fn();
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+            
+            // Small delay between requests to prevent overwhelming the server
+            await new Promise(r => setTimeout(r, 100));
+        }
+        
+        this.processingQueue = false;
+    }
+    
+    // Session management
+    startSessionMonitoring() {
+        // Check session status every minute
+        this.sessionCheckInterval = setInterval(() => {
+            const elapsed = Date.now() - this.sessionStartTime;
+            const timeUntilExpiry = this.sessionTimeout - elapsed;
+            
+            // Show warning when approaching timeout
+            if (timeUntilExpiry <= this.sessionWarningTime && !this.sessionWarningShown) {
+                this.sessionWarningShown = true;
+                const minutesLeft = Math.ceil(timeUntilExpiry / 60000);
+                
+                this.showConfirmDialog({
+                    title: 'Session Expiring Soon',
+                    message: `Your session will expire in ${minutesLeft} minutes.`,
+                    details: 'Save your work and refresh the page to continue.',
+                    confirmText: 'REFRESH NOW',
+                    cancelText: 'CONTINUE',
+                    dangerous: false
+                }).then(shouldRefresh => {
+                    if (shouldRefresh) {
+                        window.location.reload();
+                    }
+                });
+            }
+            
+            // Force logout when session expires
+            if (timeUntilExpiry <= 0) {
+                clearInterval(this.sessionCheckInterval);
+                this.handleSessionExpired();
+            }
+        }, 60000); // Check every minute
+    }
+    
+    handleSessionExpired() {
+        // Clear sensitive data
+        this.currentMessages = [];
+        this.currentConversationId = null;
+        this.conversations = [];
+        
+        // Show expiry message
+        this.showNotification('Session expired. Please log in again.', 'error');
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+    
+    // Network monitoring
+    setupNetworkMonitoring() {
+        let wasOffline = false;
+        
+        // Check online status
+        const updateOnlineStatus = () => {
+            const isOnline = navigator.onLine;
+            const statusEl = document.getElementById('connectionStatus');
+            const dotEl = document.getElementById('connectionDot');
+            
+            if (isOnline) {
+                if (wasOffline) {
+                    this.showNotification('Connection restored', 'success');
+                    wasOffline = false;
+                    
+                    // Refresh data after reconnection
+                    if (this.currentBin) {
+                        this.loadBinConversations();
+                        this.pollPresenceForBin();
+                    }
+                }
+                statusEl.textContent = 'CONNECTED';
+                dotEl.classList.add('connected');
+                dotEl.classList.remove('offline');
+            } else {
+                if (!wasOffline) {
+                    this.showNotification('Connection lost. Working offline.', 'warning');
+                    wasOffline = true;
+                }
+                statusEl.textContent = 'OFFLINE';
+                dotEl.classList.remove('connected');
+                dotEl.classList.add('offline');
+            }
+        };
+        
+        // Initial check
+        updateOnlineStatus();
+        
+        // Listen for online/offline events
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Periodic connectivity check (more reliable than events)
+        setInterval(() => {
+            if (navigator.onLine) {
+                // Try a lightweight request to verify actual connectivity
+                fetch(`${this.apiBase}/health`, { method: 'HEAD' })
+                    .then(() => updateOnlineStatus())
+                    .catch(() => {
+                        // Network request failed despite navigator.onLine = true
+                        const statusEl = document.getElementById('connectionStatus');
+                        statusEl.textContent = 'CONNECTION ISSUE';
+                    });
+            }
+        }, 30000); // Check every 30 seconds
+    }
+    
+    // Presence tracking methods
+    async startPresenceTracking() {
+        if (!this.currentConversationId || !this.currentBin) return;
+        
+        // Join the conversation
+        await this.updatePresence('join');
+        
+        // Start heartbeat interval
+        this.presenceInterval = setInterval(() => {
+            this.updatePresence('heartbeat');
+        }, 30000); // Every 30 seconds
+        
+        // Start polling for presence updates
+        this.presencePollingInterval = setInterval(() => {
+            this.pollPresenceForBin();
+        }, 5000); // Every 5 seconds
+        
+        // Initial poll
+        this.pollPresenceForBin();
+    }
+    
+    async stopPresenceTracking() {
+        if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
+            this.presenceInterval = null;
+        }
+        
+        if (this.presencePollingInterval) {
+            clearInterval(this.presencePollingInterval);
+            this.presencePollingInterval = null;
+        }
+        
+        // Leave the conversation
+        if (this.currentConversationId && this.currentBin) {
+            await this.updatePresence('leave');
+        }
+    }
+    
+    async updatePresence(action) {
+        if (!this.isCloudflare || !this.currentConversationId || !this.currentBin) return;
+        
+        try {
+            await this.fetchWithAuth(`${this.apiBase}/presence`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    conversationId: this.currentConversationId,
+                    userId: this.userId,
+                    action: action
+                })
+            });
+        } catch (error) {
+            console.error('Failed to update presence:', error);
+        }
+    }
+    
+    async pollPresenceForBin() {
+        if (!this.isCloudflare || !this.currentBin) return;
+        
+        try {
+            const response = await this.fetchWithAuth(`${this.apiBase}/presence?binId=${this.currentBin.id}`, {
+                method: 'OPTIONS'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.updatePresenceDisplay(data.conversations || {});
+            }
+        } catch (error) {
+            console.error('Failed to poll presence:', error);
+        }
+    }
+    
+    updatePresenceDisplay(presenceData) {
+        // Update each conversation file element with presence info
+        document.querySelectorAll('.conversation-file').forEach(convEl => {
+            const convId = convEl.dataset.conversationId;
+            const viewerCount = presenceData[convId] || 0;
+            
+            // Find or create presence indicator
+            let presenceEl = convEl.querySelector('.presence-indicator');
+            if (!presenceEl && viewerCount > 0) {
+                presenceEl = document.createElement('span');
+                presenceEl.className = 'presence-indicator';
+                const metaEl = convEl.querySelector('.file-meta');
+                if (metaEl) {
+                    metaEl.appendChild(presenceEl);
+                }
+            }
+            
+            if (presenceEl) {
+                if (viewerCount > 0) {
+                    // Use ASCII person icon ⚇ or ◉ or ☺ or ♟ or just 'o' for simplicity
+                    presenceEl.textContent = `◉${viewerCount}`;
+                    presenceEl.style.display = 'inline';
+                } else {
+                    presenceEl.style.display = 'none';
+                }
+            }
+        });
+    }
+    
+    disableGenerationUI() {
+        // Disable all input controls during generation
+        document.getElementById('userMessage').disabled = true;
+        document.getElementById('sendMessage').disabled = true;
+        document.getElementById('regenerateLast').disabled = true;
+        
+        // Add visual feedback
+        document.getElementById('sendMessage').textContent = 'GENERATING...';
+        document.getElementById('sendMessage').classList.add('generating');
+        
+        // Disable model selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            el.style.pointerEvents = 'none';
+            el.style.opacity = '0.5';
+        });
+    }
+    
+    enableGenerationUI() {
+        // Re-enable all input controls
+        document.getElementById('userMessage').disabled = false;
+        document.getElementById('sendMessage').disabled = false;
+        document.getElementById('regenerateLast').disabled = false;
+        
+        // Reset visual feedback
+        document.getElementById('sendMessage').textContent = 'SEND';
+        document.getElementById('sendMessage').classList.remove('generating');
+        
+        // Re-enable model selection
+        document.querySelectorAll('.model-option').forEach(el => {
+            el.style.pointerEvents = '';
+            el.style.opacity = '';
+        });
+        
+        // Focus back on input
+        document.getElementById('userMessage').focus();
+    }
+    
+    // Presence tracking methods
+    handleUserJoined(data) {
+        if (data.conversationId === this.currentConversationId && data.userId !== this.userId) {
+            this.connectedUsers.set(data.userId, data);
+            this.updatePresenceUI();
+            this.showNotification(`${data.userName || 'Another user'} joined the conversation`, 'info');
+        }
+    }
+    
+    handleUserLeft(data) {
+        if (data.userId !== this.userId) {
+            this.connectedUsers.delete(data.userId);
+            this.updatePresenceUI();
+            this.showNotification(`${data.userName || 'A user'} left the conversation`, 'info');
+        }
+    }
+    
+    updateActiveUsers(users) {
+        this.connectedUsers.clear();
+        users.forEach(user => {
+            if (user.userId !== this.userId && user.conversationId === this.currentConversationId) {
+                this.connectedUsers.set(user.userId, user);
+            }
+        });
+        this.updatePresenceUI();
+    }
+    
+    updatePresenceUI() {
+        const presenceEl = document.getElementById('presenceIndicator');
+        if (!presenceEl) return;
+        
+        const userCount = this.connectedUsers.size;
+        if (userCount > 0) {
+            presenceEl.style.display = 'flex';
+            presenceEl.innerHTML = `
+                <span class="presence-dot"></span>
+                <span class="presence-text">${userCount} other user${userCount > 1 ? 's' : ''} connected</span>
+            `;
+        } else {
+            presenceEl.style.display = 'none';
+        }
+    }
+    
     loadDataset() {
         if (!this.isCloudflare && this.socket) {
             this.socket.emit('get-dataset');
         }
     }
+    
+    // Recovery methods for failed messages
+    async retryLastMessage() {
+        // Remove any error indicators
+        const flow = document.getElementById('conversationFlow');
+        const errorIndicators = flow.querySelectorAll('.message-error, .message-recovery');
+        errorIndicators.forEach(el => el.remove());
+        
+        // Get the last user message
+        const lastUserMessage = [...this.currentMessages].reverse().find(m => m.role === 'user');
+        if (!lastUserMessage) {
+            this.showNotification('No message to retry', 'warning');
+            return;
+        }
+        
+        // Check if we already have an assistant response after this message
+        const lastUserIndex = this.currentMessages.lastIndexOf(lastUserMessage);
+        if (lastUserIndex < this.currentMessages.length - 1) {
+            this.showNotification('Response already exists', 'info');
+            return;
+        }
+        
+        console.log('[TuneForge] Retrying last message:', {
+            content: lastUserMessage.content.substring(0, 50) + '...',
+            messageIndex: lastUserIndex
+        });
+        
+        // Temporarily remove the message and re-send it
+        this.currentMessages.pop();
+        const messageContent = lastUserMessage.content;
+        
+        // Remove the UI element
+        const lastMessageBlock = flow.lastElementChild;
+        if (lastMessageBlock && lastMessageBlock.querySelector('.user')) {
+            lastMessageBlock.remove();
+        }
+        
+        // Re-add to input and send
+        document.getElementById('userMessage').value = messageContent;
+        await this.sendMessage();
+    }
+    
+    removeLastMessage() {
+        const flow = document.getElementById('conversationFlow');
+        
+        // Remove error indicators
+        const errorIndicators = flow.querySelectorAll('.message-error, .message-recovery');
+        errorIndicators.forEach(el => el.remove());
+        
+        // Get the last user message
+        const lastUserMessage = [...this.currentMessages].reverse().find(m => m.role === 'user');
+        if (!lastUserMessage) {
+            this.showNotification('No message to remove', 'warning');
+            return;
+        }
+        
+        // Check if we already have an assistant response after this message
+        const lastUserIndex = this.currentMessages.lastIndexOf(lastUserMessage);
+        if (lastUserIndex < this.currentMessages.length - 1) {
+            this.showNotification('Cannot remove - response already exists', 'warning');
+            return;
+        }
+        
+        // Remove from messages array
+        this.currentMessages.pop();
+        
+        // Remove from UI
+        const lastMessageBlock = flow.lastElementChild;
+        if (lastMessageBlock && lastMessageBlock.querySelector('.user')) {
+            lastMessageBlock.remove();
+        }
+        
+        // Clear backup
+        sessionStorage.removeItem('tuneforge_pending_message');
+        
+        // Update turn count
+        const turnCount = Math.floor(this.currentMessages.length / 2);
+        document.getElementById('turnCount').textContent = turnCount;
+        
+        this.showNotification('Message removed', 'success');
+    }
+    
+    // Check for pending messages on load
+    checkPendingMessage() {
+        const pendingStr = sessionStorage.getItem('tuneforge_pending_message');
+        if (!pendingStr) return;
+        
+        try {
+            const pending = JSON.parse(pendingStr);
+            
+            // Check if it's for the current conversation
+            if (pending.binId === this.currentBin?.id && 
+                pending.conversationId === this.currentConversationId) {
+                
+                // Check if message is recent (within last hour)
+                const age = Date.now() - pending.timestamp;
+                if (age < 3600000) { // 1 hour
+                    console.log('[TuneForge] Found pending message:', {
+                        age: Math.round(age / 1000) + 's',
+                        content: pending.content.substring(0, 50) + '...'
+                    });
+                    
+                    // Restore to input field
+                    const input = document.getElementById('userMessage');
+                    if (input && !input.value) {
+                        input.value = pending.content;
+                        this.showNotification('Restored unsent message', 'info');
+                    }
+                }
+            }
+            
+            // Clear old pending message
+            sessionStorage.removeItem('tuneforge_pending_message');
+        } catch (error) {
+            console.error('[TuneForge] Error checking pending message:', error);
+        }
+    }
 }
 
 // Initialize when DOM is ready
+console.log('Setting up DOMContentLoaded listener');
 document.addEventListener('DOMContentLoaded', () => {
-    window.tuneforge = new TuneForgeUltimate();
+    console.log('DOMContentLoaded fired, creating TuneForgeUltimate instance');
+    try {
+        window.tuneforge = new TuneForgeUltimate();
+        console.log('TuneForgeUltimate instance created successfully');
+    } catch (error) {
+        console.error('Error creating TuneForgeUltimate:', error);
+    }
 });
