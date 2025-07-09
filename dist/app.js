@@ -175,8 +175,16 @@ class TuneForgeUltimate {
         const password = passwordInput.value;
         const passwordConfirm = passwordConfirmInput.value;
 
+        const emailRegex = /^[^
+@]+@[^
+@]+\.[^
+@]+$/;
         if (!email) {
             errorEl.textContent = 'Email required';
+            return;
+        }
+        if (!emailRegex.test(email)) {
+            errorEl.textContent = 'Please enter a valid email address.';
             return;
         }
 
