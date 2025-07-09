@@ -19,15 +19,34 @@ export async function onRequestGet(context) {
   
   // Try to get session from KV
   const token = headerToken || cookieToken;
+  let sessionData = null;
+  let userData = null;
+  
   if (token) {
     const session = await env.SESSIONS.get(`session:${token}`, 'json');
     console.log('[Session Test] Session found:', session ? 'yes' : 'no');
+    
     if (session) {
-      console.log('[Session Test] Session userId:', session.userId);
-      const user = await env.USERS.get(`user:${session.userId}`, 'json');
-      console.log('[Session Test] User found:', user ? 'yes' : 'no');
-      if (user) {
-        console.log('[Session Test] User email:', user.email);
+      sessionData = session;
+      console.log('[Session Test] Session structure:', JSON.stringify(session));
+      console.log('[Session Test] Session has email?', 'email' in session);
+      console.log('[Session Test] Session has userId?', 'userId' in session);
+      
+      // Try both ways to find user
+      if (session.email) {
+        const userByEmail = await env.USERS.get(`user:${session.email}`, 'json');
+        console.log('[Session Test] User by email found:', userByEmail ? 'yes' : 'no');
+        if (userByEmail) {
+          userData = userByEmail;
+        }
+      }
+      
+      if (!userData && session.userId) {
+        const userById = await env.USERS.get(`user:${session.userId}`, 'json');
+        console.log('[Session Test] User by ID found:', userById ? 'yes' : 'no');
+        if (userById) {
+          userData = userById;
+        }
       }
     }
   }
@@ -38,7 +57,9 @@ export async function onRequestGet(context) {
     user: context.data?.user?.email || null,
     cookieToken,
     headerToken,
-    tokenUsed: token
+    tokenUsed: token,
+    sessionData: sessionData,
+    userData: userData
   }), {
     headers: { 'Content-Type': 'application/json' }
   });
