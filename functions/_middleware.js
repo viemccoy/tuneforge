@@ -10,8 +10,11 @@ export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
   
+  console.log('[Middleware] Processing request:', request.method, url.pathname);
+  
   // Skip auth for public endpoints
   if (PUBLIC_PATHS.includes(url.pathname)) {
+    console.log('[Middleware] Skipping auth for public path');
     return next();
   }
   
@@ -92,6 +95,7 @@ export async function onRequest(context) {
   
   // Log access for monitoring
   console.log(`[Access] ${session.email} -> ${request.method} ${url.pathname}`);
+  console.log('[Middleware] User set in context, proceeding to endpoint');
   
   return next();
 }
