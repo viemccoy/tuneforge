@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Auth Test</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        button { background: #0f0; color: #000; border: none; padding: 10px; cursor: pointer; }
+        pre { background: #111; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>TuneForge Auth Test</h1>
+    
+    <div>
+        <h2>1. Test User Check</h2>
+        <input type="email" id="email" value="vie@morpheus.systems" />
+        <button onclick="testUserCheck()">Check User</button>
+        <pre id="userResult"></pre>
+    </div>
+    
+    <div>
+        <h2>2. Test Login</h2>
+        <input type="password" id="password" placeholder="Password" />
+        <button onclick="testLogin()">Login</button>
+        <pre id="loginResult"></pre>
+    </div>
+    
+    <div>
+        <h2>3. Test Protected Endpoint</h2>
+        <button onclick="testProtected()">Test Bins</button>
+        <pre id="protectedResult"></pre>
+    </div>
+
+    <script>
+        async function testUserCheck() {
+            const email = document.getElementById('email').value;
+            const result = document.getElementById('userResult');
+            
+            try {
+                result.textContent = 'Checking user...\n';
+                
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                result.textContent += `Status: ${response.status}\n`;
+                const data = await response.json();
+                result.textContent += `Response: ${JSON.stringify(data, null, 2)}\n`;
+                
+            } catch (error) {
+                result.textContent += `Error: ${error.message}\n`;
+            }
+        }
+        
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const result = document.getElementById('loginResult');
+            
+            try {
+                result.textContent = 'Logging in...\n';
+                
+                const response = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                result.textContent += `Status: ${response.status}\n`;
+                const data = await response.json();
+                result.textContent += `Response: ${JSON.stringify(data, null, 2)}\n`;
+                
+                if (data.session) {
+                    sessionStorage.setItem('tuneforge_session', data.session);
+                    result.textContent += '\nSession stored in sessionStorage!\n';
+                }
+                
+            } catch (error) {
+                result.textContent += `Error: ${error.message}\n`;
+            }
+        }
+        
+        async function testProtected() {
+            const result = document.getElementById('protectedResult');
+            const token = sessionStorage.getItem('tuneforge_session');
+            
+            try {
+                result.textContent = 'Testing protected endpoint...\n';
+                result.textContent += `Using token: ${token}\n`;
+                
+                const response = await fetch('/api/bins-fixed', {
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Session-Token': token
+                    }
+                });
+                
+                result.textContent += `Status: ${response.status}\n`;
+                const data = await response.json();
+                result.textContent += `Response: ${JSON.stringify(data, null, 2)}\n`;
+                
+            } catch (error) {
+                result.textContent += `Error: ${error.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>
