@@ -3732,3 +3732,17 @@ document.addEventListener('click', (e) => {
         }
     }
 });
+
+// Global keypress handler for auth fields
+document.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const authFields = ['authEmail', 'authPassword', 'authPasswordConfirm'];
+        if (authFields.includes(e.target.id)) {
+            console.log('Enter pressed in auth field via global handler');
+            e.preventDefault();
+            if (window.tuneforge) {
+                window.tuneforge.authenticate();
+            }
+        }
+    }
+});
