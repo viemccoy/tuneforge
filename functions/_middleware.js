@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   '/api/session-test'
 ];
 
+// Export for all HTTP methods
 export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
@@ -77,3 +78,12 @@ export async function onRequest(context) {
   
   return next();
 }
+
+// Also export individual methods
+export const onRequestGet = onRequest;
+export const onRequestPost = onRequest;
+export const onRequestPut = onRequest;
+export const onRequestDelete = onRequest;
+export const onRequestPatch = onRequest;
+export const onRequestHead = onRequest;
+export const onRequestOptions = onRequest;

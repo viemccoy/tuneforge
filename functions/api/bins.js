@@ -1,20 +1,9 @@
 // Bin management endpoints with team-based access
-export async function onRequestGet(context) {
-  console.log('[Bins] Context keys:', Object.keys(context));
-  console.log('[Bins] Has user?', !!context.user);
-  console.log('[Bins] Has data.user?', !!context.data?.user);
-  
+import { requireAuth } from '../auth-wrapper.js';
+
+async function handleGet(context) {
   const { request, env, user } = context;
-  // User is injected by middleware
-  if (!user) {
-    console.log('[Bins] No user found, returning 401');
-    return new Response(JSON.stringify({ 
-      error: 'Authentication required' 
-    }), { 
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  console.log('[Bins] User authenticated:', user.email);
   
   try {
     // Check if BINS is available
