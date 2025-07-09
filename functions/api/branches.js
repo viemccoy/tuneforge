@@ -1,4 +1,5 @@
 // Conversation Branching API
+import TuneForgeMlflowTracer from '../../src/lib/mlflow-tracer.js';
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -81,6 +82,24 @@ export async function onRequestPost(context) {
       }
     };
     
+    // Track branch creation with MLFlow
+    if (env.MLFLOW_TRACKING_URI) {
+      try {
+        const mlflowTracer = new TuneForgeMlflowTracer(
+          env.MLFLOW_EXPERIMENT_NAME || 'TuneForge-Conversations',
+          env.MLFLOW_TRACKING_URI
+        );
+        await mlflowTracer.trackBranchOperation('create', {
+          branchId,
+          branchPoint,
+          messages,
+          metadata: branchData.metadata
+        });
+      } catch (mlflowError) {
+        console.warn('MLFlow branch tracking failed:', mlflowError.message);
+      }
+    }
+    
     await env.CONVERSATIONS.put(key, JSON.stringify(branchData));
     
     return new Response(JSON.stringify({ 
@@ -147,6 +166,24 @@ export async function onRequestPut(context) {
       
       mainConv.metadata.lastMerged = new Date().toISOString();
       mainConv.metadata.mergedFrom = branchId;
+      
+      // Track branch merge with MLFlow
+      if (env.MLFLOW_TRACKING_URI) {
+        try {
+          const mlflowTracer = new TuneForgeMlflowTracer(
+            env.MLFLOW_EXPERIMENT_NAME || 'TuneForge-Conversations',
+            env.MLFLOW_TRACKING_URI
+          );
+          await mlflowTracer.trackBranchOperation('merge', {
+            branchId,
+            branchPoint: branchData.branchPoint,
+            messages: mainConv.messages,
+            metadata: { mergedAt: new Date().toISOString() }
+          });
+        } catch (mlflowError) {
+          console.warn('MLFlow merge tracking failed:', mlflowError.message);
+        }
+      }
       
       // Save updated main conversation
       await env.CONVERSATIONS.put(mainKey, JSON.stringify(mainConv));

@@ -10,6 +10,7 @@ import { ModelManager } from './lib/models.js';
 import { PersonaGenerator } from './lib/personas.js';
 import { DatasetManager } from './lib/dataset.js';
 import { ConversationManager } from './lib/conversation.js';
+import TuneForgeMlflowTracer from './lib/mlflow-tracer.js';
 
 dotenv.config();
 
@@ -27,6 +28,16 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Initialize MLFlow tracer
+let mlflowTracer = null;
+if (process.env.MLFLOW_TRACKING_URI) {
+  mlflowTracer = new TuneForgeMlflowTracer(
+    process.env.MLFLOW_EXPERIMENT_NAME || 'TuneForge-Local',
+    process.env.MLFLOW_TRACKING_URI
+  );
+  console.log('MLFlow tracking enabled for local development');
+}
 
 // Serve static files
 app.use(express.static(join(__dirname, 'web')));
@@ -53,10 +64,14 @@ io.on('connection', (socket) => {
   console.log('✅ User connected:', socket.id);
   console.log('Active connections:', io.engine.clientsCount);
   
-  const modelManager = new ModelManager();
+  const modelManager = new ModelManager(mlflowTracer);
   const personaGenerator = new PersonaGenerator();
   const datasetManager = new DatasetManager(`datasets/web_session_${Date.now()}.jsonl`);
   const conversationManager = new ConversationManager();
+  
+  // Track connection for this conversation session
+  let currentConversationId = null;
+  let currentBinId = null;
 
   socket.on('start-session', async (config) => {
     try {
@@ -84,11 +99,24 @@ io.on('connection', (socket) => {
       
       console.log('Generate request received:', { models, messageCount: messages.length });
       
+      // Track with MLFlow if we have conversation context
+      if (mlflowTracer && !currentConversationId) {
+        // Start a new conversation run for this session
+        currentConversationId = `local-${socket.id}-${Date.now()}`;
+        currentBinId = data.binId || 'local-dev';
+        await mlflowTracer.startConversationRun(currentConversationId, currentBinId, 'Local Development Session');
+      }
+      
       // Generate responses with the full message history
       const responses = await modelManager.generateMultipleResponsesWithHistory(
         [...messages, { role: 'system', content: systemPrompt }],
         models,
-        { temperature, maxTokens }
+        { 
+          temperature, 
+          maxTokens,
+          systemPrompt,
+          binId: currentBinId
+        }
       );
       
       socket.emit('responses', {
@@ -220,7 +248,9 @@ io.on('connection', (socket) => {
           frequencyPenalty: options.frequencyPenalty,
           presencePenalty: options.presencePenalty,
           seed: options.seed,
-          systemPromptOverride: options.systemPromptOverride
+          systemPromptOverride: options.systemPromptOverride,
+          systemPrompt: options.systemPromptOverride || 'You are a helpful assistant.',
+          binId: currentBinId
         }
       );
 
@@ -264,8 +294,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('User disconnected:', socket.id);
+    
+    // End MLFlow run if active
+    if (mlflowTracer && currentConversationId) {
+      try {
+        await mlflowTracer.endRun('conversation');
+        console.log('MLFlow run ended for conversation:', currentConversationId);
+      } catch (error) {
+        console.warn('Failed to end MLFlow run:', error.message);
+      }
+    }
   });
 });
 

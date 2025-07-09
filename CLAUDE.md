@@ -114,7 +114,54 @@ sanitizeInput(input) {
 - Automatic reconnection attempts
 - Request queuing during connection issues
 
-### 9. Beautiful UI Components
+### 9. MLFlow Integration for Conversation Tracking
+
+#### Overview
+TuneForge now integrates with MLFlow to provide comprehensive tracking of AI conversations, branching operations, and performance metrics. This integration respects the loom/branching architecture by tracking both main conversation threads and branch operations separately.
+
+#### Features
+- **Conversation Tracking**: Each conversation becomes an MLFlow run with metrics and parameters
+- **Branch Awareness**: Branch operations are tracked with their parent relationships
+- **Generation Metrics**: AI generation requests and responses are logged with performance data
+- **Loom Integration**: The conversation multiverse navigator data is captured in MLFlow
+
+#### Tracked Events
+```javascript
+// AI Generation Events
+trackGeneration(requestData) - Logs generation requests
+trackGenerationResponse(traceId, responses, duration) - Logs responses and metrics
+
+// Conversation Events  
+startConversationRun(conversationId, binId, name) - Starts MLFlow run for conversation
+trackConversationSave(conversationData) - Logs conversation saves
+
+// Branch/Loom Events
+trackBranchOperation('create', branchData) - Logs branch creation
+trackBranchOperation('merge', branchData) - Logs branch merges
+startBranchRun(conversationId, branchId, branchPoint) - Starts branch-specific run
+```
+
+#### Metrics Tracked
+- **Generation Metrics**: Duration, success rate, token usage, model performance
+- **Conversation Metrics**: Message count, turn count, branch depth
+- **Branch Metrics**: Branch point, message count, merge success
+
+#### Configuration
+Set the following environment variables to enable MLFlow tracking:
+- `MLFLOW_TRACKING_URI` - MLFlow server endpoint
+- `MLFLOW_EXPERIMENT_NAME` - Experiment name (optional)
+
+If MLFlow is not configured, the system continues to work normally without tracking.
+
+#### Data Export
+The tracer provides methods to export conversation traces:
+```javascript
+getTraceDump() - Returns formatted markdown dump
+exportTraces('json') - Returns JSON export
+exportTraces('markdown') - Returns markdown export
+```
+
+### 10. Beautiful UI Components
 
 #### Confirmation Dialogs
 - Cyberpunk-styled modal overlays
@@ -195,6 +242,8 @@ sanitizeInput(input) {
 - `AUTH_PASSWORD` - Access control password
 - `OPENAI_API_KEY` - OpenAI API access
 - `ANTHROPIC_API_KEY` - Anthropic API access
+- `MLFLOW_TRACKING_URI` - MLFlow server URI (e.g., http://127.0.0.1:8080)
+- `MLFLOW_EXPERIMENT_NAME` - MLFlow experiment name (default: TuneForge-Conversations)
 
 ## Future Enhancement Ideas
 

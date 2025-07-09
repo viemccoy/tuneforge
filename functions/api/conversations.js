@@ -1,4 +1,5 @@
 // Conversation management endpoints with comprehensive logging
+import TuneForgeMlflowTracer from '../../src/lib/mlflow-tracer.js';
 
 // Helper function to log events
 function logEvent(env, event, data) {
@@ -171,6 +172,20 @@ export async function onRequestPost(context) {
       messageCount: messages.length,
       turnCount: conversationData.metadata.turnCount
     });
+    
+    // Track conversation save with MLFlow
+    if (env.MLFLOW_TRACKING_URI) {
+      try {
+        const mlflowTracer = new TuneForgeMlflowTracer(
+          env.MLFLOW_EXPERIMENT_NAME || 'TuneForge-Conversations',
+          env.MLFLOW_TRACKING_URI
+        );
+        await mlflowTracer.startConversationRun(convId, binId, conversationData.name);
+        await mlflowTracer.trackConversationSave(conversationData);
+      } catch (mlflowError) {
+        console.warn('MLFlow tracking failed:', mlflowError.message);
+      }
+    }
     
     await env.CONVERSATIONS.put(key, JSON.stringify(conversationData));
     

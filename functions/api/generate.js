@@ -2,13 +2,25 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+// Note: In Cloudflare Pages, we need to import differently
+// For now, we'll create the tracer inline until we fix the import path
 
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  // Initialize MLFlow tracer if configured
+  let mlflowTracer = null;
+  if (env.MLFLOW_TRACKING_URI) {
+    mlflowTracer = new TuneForgeMlflowTracer(
+      env.MLFLOW_EXPERIMENT_NAME || 'TuneForge-Conversations',
+      env.MLFLOW_TRACKING_URI
+    );
+  }
+  
   // Log request details for debugging
   const requestId = crypto.randomUUID();
   const timestamp = new Date().toISOString();
+  const startTime = Date.now();
   
   try {
     const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens } = await request.json();
@@ -19,6 +31,20 @@ export async function onRequestPost(context) {
       models: models || [],
       lastMessage: messages?.length > 0 ? messages[messages.length - 1].content.substring(0, 50) + '...' : 'none'
     });
+    
+    // Track generation request with MLFlow
+    let traceId = null;
+    if (mlflowTracer) {
+      traceId = await mlflowTracer.trackGeneration({
+        binId,
+        systemPrompt,
+        messages,
+        models,
+        temperature,
+        maxTokens,
+        max_completion_tokens
+      });
+    }
     
     if (!binId || !messages || !models || models.length === 0) {
       return new Response(JSON.stringify({ error: 'Invalid request' }), {
@@ -171,12 +197,19 @@ export async function onRequestPost(context) {
     
     const responses = await Promise.all(responsePromises);
     
+    // Calculate duration and track response with MLFlow
+    const duration = Date.now() - startTime;
+    if (mlflowTracer && traceId) {
+      await mlflowTracer.trackGenerationResponse(traceId, responses, duration);
+    }
+    
     // Log response summary
     const successCount = responses.filter(r => !r.error).length;
     console.log(`[${timestamp}] Request ${requestId} completed:`, {
       totalResponses: responses.length,
       successfulResponses: successCount,
-      failedResponses: responses.length - successCount
+      failedResponses: responses.length - successCount,
+      duration: `${duration}ms`
     });
     
     return new Response(JSON.stringify({ responses }), {

@@ -3,9 +3,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export class ModelManager {
-  constructor() {
+  constructor(mlflowTracer = null) {
+    this.mlflowTracer = mlflowTracer;
+    
     this.openai = process.env.OPENAI_API_KEY ? new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+      apiKey: process.env.OPENAI_API_KEY,
+      ...(process.env.OPENAI_BASE_URL && { baseURL: process.env.OPENAI_BASE_URL })
     }) : null;
 
     this.anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({
@@ -25,20 +28,23 @@ export class ModelManager {
     if (this.openai) {
       models.push(
         { name: 'GPT-4.1', id: 'gpt-4.1-2025-04-14', provider: 'openai' },
-        { name: 'GPT-o3', id: 'o3-2025-04-16', provider: 'openai' }
+        { name: 'GPT-o3', id: 'o3-2025-04-16', provider: 'openai' },
+        { name: 'GPT-o3-pro', id: 'o3-pro-2025-04-16', provider: 'openai' }
       );
     }
 
-    if (this.anthropic) {
-      models.push(
-        { name: 'Claude Opus 4', id: 'claude-opus-4-20250514', provider: 'anthropic' },
-        { name: 'Claude Sonnet 4', id: 'claude-sonnet-4-20250514', provider: 'anthropic' }
-      );
-    }
+    // Anthropic models hidden from UI but kept in backend for compatibility
+    // if (this.anthropic) {
+    //   models.push(
+    //     { name: 'Claude Opus 4', id: 'claude-opus-4-20250514', provider: 'anthropic' },
+    //     { name: 'Claude Sonnet 4', id: 'claude-sonnet-4-20250514', provider: 'anthropic' }
+    //   );
+    // }
 
     if (this.google) {
       models.push(
-        { name: 'Gemini 2.5 Pro', id: 'gemini-2.5-pro', provider: 'google' }
+        { name: 'Gemini 2.5 Pro', id: 'gemini-2.5-pro', provider: 'google' },
+        { name: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash', provider: 'google' }
       );
     }
 
@@ -92,7 +98,7 @@ export class ModelManager {
       ]
     };
     
-    // Add reasoning-specific parameters for o3
+    // Add reasoning-specific parameters for o3 and o3-pro
     if (modelId.startsWith('o3')) {
       console.log(`🧠 Using reasoning model: ${modelId} - accounting for reasoning tokens`);
       // For o3, set a much higher limit to account for reasoning tokens
@@ -188,13 +194,32 @@ export class ModelManager {
   }
 
   async generateMultipleResponsesWithHistory(messages, modelIds, options = {}) {
+    const startTime = Date.now();
+    let traceId = null;
+    
+    // Track generation request with MLFlow
+    if (this.mlflowTracer) {
+      try {
+        traceId = await this.mlflowTracer.trackGeneration({
+          binId: options.binId || 'local-dev',
+          systemPrompt: options.systemPrompt || 'You are a helpful assistant.',
+          messages: messages,
+          models: modelIds,
+          temperature: options.temperature || 0.7,
+          maxTokens: options.maxTokens || 1000
+        });
+      } catch (error) {
+        console.warn('MLFlow tracking failed:', error.message);
+      }
+    }
+    
     const promises = modelIds.map(modelId => 
       this.generateResponseWithHistory(modelId, messages, options)
     );
 
     const results = await Promise.allSettled(promises);
     
-    return results.map((result, index) => {
+    const responses = results.map((result, index) => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {
@@ -206,6 +231,18 @@ export class ModelManager {
         };
       }
     });
+    
+    // Track generation response with MLFlow
+    if (this.mlflowTracer && traceId) {
+      try {
+        const duration = Date.now() - startTime;
+        await this.mlflowTracer.trackGenerationResponse(traceId, responses, duration);
+      } catch (error) {
+        console.warn('MLFlow response tracking failed:', error.message);
+      }
+    }
+    
+    return responses;
   }
 
   async generateResponseWithHistory(modelId, messages, options = {}) {
@@ -254,7 +291,7 @@ export class ModelManager {
       }))
     };
     
-    // Add reasoning-specific parameters for o3
+    // Add reasoning-specific parameters for o3 and o3-pro
     if (modelId.startsWith('o3')) {
       console.log(`🧠 Using reasoning model with history: ${modelId} - accounting for reasoning tokens`);
       // For o3, set a much higher limit to account for reasoning tokens

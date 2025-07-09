@@ -1130,10 +1130,10 @@ class TuneForgeUltimate {
             this.availableModels = [
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
+                { id: 'o3-pro-2025-04-16', name: 'GPT-o3-pro', provider: 'openai' },
                 { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
-                { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
-                { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' },
                 { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
                 { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
                 { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
@@ -1148,6 +1148,21 @@ class TuneForgeUltimate {
     renderModelSelection() {
         const container = document.getElementById('modelSelection');
         container.innerHTML = '';
+        
+        // Load saved model selection from localStorage
+        const savedModels = localStorage.getItem('tuneforge_selected_models');
+        if (savedModels) {
+            try {
+                this.selectedModels = JSON.parse(savedModels);
+                // Filter out models that are no longer available
+                this.selectedModels = this.selectedModels.filter(modelId => 
+                    this.availableModels.some(m => m.id === modelId)
+                );
+            } catch (e) {
+                console.warn('Failed to load saved model selection:', e);
+                this.selectedModels = [];
+            }
+        }
         
         this.availableModels.forEach(model => {
             const modelEl = document.createElement('div');
@@ -1176,6 +1191,9 @@ class TuneForgeUltimate {
             this.selectedModels.push(modelId);
         }
         
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
+        
         // Update UI
         const modelEl = document.querySelector(`[data-model-id="${modelId}"]`);
         if (modelEl) {
@@ -1187,6 +1205,8 @@ class TuneForgeUltimate {
     
     selectAllModels() {
         this.selectedModels = this.availableModels.map(m => m.id);
+        // Save to localStorage
+        localStorage.setItem('tuneforge_selected_models', JSON.stringify(this.selectedModels));
         document.querySelectorAll('.model-option').forEach(el => {
             el.classList.add('selected');
         });
