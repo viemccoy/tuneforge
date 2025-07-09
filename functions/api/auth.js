@@ -42,6 +42,7 @@ async function verifyPassword(storedHash, password) {
 
 // Helper to create a secure session
 async function createSession(env, user) {
+  console.log('[Auth] Creating session for user:', user.email);
   const token = crypto.randomUUID();
   const session = {
     token,
@@ -53,7 +54,13 @@ async function createSession(env, user) {
     // NO expiry field - sessions persist forever
   };
   
-  await env.SESSIONS.put(`session:${token}`, JSON.stringify(session));
+  try {
+    await env.SESSIONS.put(`session:${token}`, JSON.stringify(session));
+    console.log('[Auth] Session created successfully:', token);
+  } catch (error) {
+    console.error('[Auth] Failed to store session:', error);
+    throw error;
+  }
   
   return session;
 }
@@ -91,8 +98,11 @@ async function ensureTeam(env, email) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  console.log('[Auth] Login attempt started');
+  
   try {
     const { email, password } = await request.json();
+    console.log('[Auth] Login attempt for email:', email);
     
     if (!email) {
       return new Response(JSON.stringify({ 
@@ -161,7 +171,7 @@ export async function onRequestPost(context) {
     // Create persistent session
     const session = await createSession(env, user);
     
-    return new Response(JSON.stringify({ 
+    const response = new Response(JSON.stringify({ 
       success: true,
       user: { 
         email: user.email, 
@@ -174,6 +184,9 @@ export async function onRequestPost(context) {
         'Set-Cookie': `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`
       }
     });
+    
+    console.log('[Auth] Sending response with Set-Cookie header:', `session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax`);
+    return response;
     
   } catch (error) {
     console.error('Auth error:', error);

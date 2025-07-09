@@ -22,9 +22,12 @@ export async function onRequest(context) {
   
   // Get session from cookie
   const cookie = request.headers.get('Cookie');
+  console.log('[Middleware] Raw cookie header:', cookie);
   const sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+  console.log('[Middleware] Extracted session token:', sessionToken);
   
   if (!sessionToken) {
+    console.log('[Middleware] No session token found in cookies');
     return new Response(JSON.stringify({ 
       error: "Authentication required",
       code: "NO_SESSION"
@@ -35,7 +38,10 @@ export async function onRequest(context) {
   }
   
   // Verify session (no expiry check needed)
+  console.log('[Middleware] Looking up session:', `session:${sessionToken}`);
   const session = await env.SESSIONS.get(`session:${sessionToken}`, 'json');
+  console.log('[Middleware] Session lookup result:', session ? 'found' : 'not found');
+  
   if (!session) {
     return new Response(JSON.stringify({ 
       error: "Invalid session",
