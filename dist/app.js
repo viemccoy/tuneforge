@@ -2308,7 +2308,7 @@ class TuneForgeUltimate {
                 
                 const savedConv = await response.json();
                     
-                    if (isNewConversation) {
+                if (isNewConversation) {
                         this.currentConversationId = savedConv.id;
                         
                         // Remove placeholder if it exists
@@ -2318,46 +2318,46 @@ class TuneForgeUltimate {
                         if (placeholderIndex > -1) {
                             // Replace placeholder with real conversation
                             this.conversations[placeholderIndex] = savedConv;
-                            // Don't increment count since we already did when creating placeholder
-                        } else {
+                        // Don't increment count since we already did when creating placeholder
+                    } else {
                             // No placeholder, this is a direct save
                             this.conversations.push(savedConv);
                             this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
                         }
                         
                         // Enable delete button for new conversation
-                        document.getElementById('deleteConversation').disabled = false;
-                    } else {
-                        // Update existing conversation in list
+                    document.getElementById('deleteConversation').disabled = false;
+                } else {
+                    // Update existing conversation in list
                         const index = this.conversations.findIndex(c => c.id === conversationId);
                         if (index > -1) {
                             this.conversations[index] = savedConv;
-                        }
                     }
+                }
+                
+                this.updateStats();
                     
-                    this.updateStats();
-                    
-                    // Update the conversation in the UI
-                    if (this.currentBin) {
+                // Update the conversation in the UI
+                if (this.currentBin) {
                         if (isNewConversation) {
-                            // Update bin count in UI immediately
-                            this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                        // Update bin count in UI immediately
+                        this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
                             
-                            // Ensure bin is expanded to show new conversation
-                            const convList = document.getElementById(`convList-${this.currentBin.id}`);
-                            if (convList && convList.style.display === 'none') {
-                                await this.toggleBinExpanded(this.currentBin.id);
-                            } else {
-                                // For new conversations, reload the list to add it
-                                await this.loadConversationsForBin(this.currentBin.id);
-                            }
+                        // Ensure bin is expanded to show new conversation
+                        const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                        if (convList && convList.style.display === 'none') {
+                            await this.toggleBinExpanded(this.currentBin.id);
                         } else {
-                            // For existing conversations, just update the name and turn count
-                            this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
+                            // For new conversations, reload the list to add it
+                            await this.loadConversationsForBin(this.currentBin.id);
                         }
+                    } else {
+                        // For existing conversations, just update the name and turn count
+                        this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
                     }
-                    
-                    if (!autoSave) {
+                }
+                
+                if (!autoSave) {
                         this.showNotification('Conversation saved to dataset');
                         // Don't clear the conversation on manual save, just disable the save button
                         document.getElementById('saveConversation').disabled = true;
