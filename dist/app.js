@@ -311,6 +311,31 @@ class TuneForgeUltimate {
         document.getElementById('userTeam').textContent = `[${user.teamId}]`;
     }
     
+    async fetchUserInfo() {
+        try {
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            if (!sessionToken) return;
+            
+            // Try to get user info from session test endpoint
+            const response = await fetch(`${this.apiBase}/session-test`, {
+                headers: {
+                    'X-Session-Token': sessionToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.session && data.user) {
+                    this.currentUser = data.user;
+                    this.showUserInfo(data.user);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch user info:', error);
+        }
+    }
+    
     async logout() {
         try {
             // Clear stored session
@@ -346,6 +371,9 @@ class TuneForgeUltimate {
             // In Cloudflare mode, we're connected once authenticated
             document.getElementById('connectionStatus').textContent = 'CONNECTED';
             document.getElementById('connectionDot').classList.add('connected');
+            
+            // Fetch and display user info
+            await this.fetchUserInfo();
         }
         
         // Load initial data - don't let this block the UI
