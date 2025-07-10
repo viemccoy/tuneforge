@@ -1,5 +1,7 @@
 // TuneForge Ultimate - Combining Original Power with Bin Management
 console.log('TuneForge Ultimate script loaded');
+console.log('Script URL:', document.currentScript?.src || 'inline');
+console.log('Page URL:', window.location.href);
 
 class TuneForgeUltimate {
     constructor() {
@@ -58,42 +60,40 @@ class TuneForgeUltimate {
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
-        this.checkAuth();
+        console.log('Constructor complete, calling checkAuth...');
+        try {
+            this.checkAuth();
+        } catch (error) {
+            console.error('Error in checkAuth:', error);
+            console.error('Stack:', error.stack);
+        }
     }
     
     async checkAuth() {
         console.log('checkAuth() called');
-        console.log('isCloudflare:', this.isCloudflare);
-        console.log('hostname:', window.location.hostname);
         
         if (this.isCloudflare) {
             // Check if we have a session token
             const sessionToken = sessionStorage.getItem('tuneforge_session');
-            console.log('Session token from storage:', sessionToken);
             
             if (!sessionToken) {
                 // No token, redirect to login
-                console.log('No session token found, redirecting to login');
                 window.location.href = '/login.html';
                 return;
             }
             
             // Verify token is valid by trying to fetch bins
             try {
-                console.log('Verifying token by fetching bins...');
                 const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
-                console.log('Bins fetch response:', response.status);
                 
                 if (!response.ok) {
                     // Invalid token, redirect to login
-                    console.log('Invalid token (response not ok), redirecting to login');
                     sessionStorage.removeItem('tuneforge_session');
                     window.location.href = '/login.html';
                     return;
                 }
                 
                 // Valid session, proceed
-                console.log('Valid session, proceeding to initialize');
                 this.authenticated = true;
                 this.initialize();
                 
@@ -365,7 +365,6 @@ class TuneForgeUltimate {
     
     async initialize() {
         console.log('Initializing TuneForge Ultimate...');
-        console.log('Setting connection status to CONNECTED');
         
         // Initialize UI state
         document.querySelector('.app-container').classList.add('no-bin-selected');
@@ -380,18 +379,8 @@ class TuneForgeUltimate {
             this.initializeSocket();
         } else {
             // In Cloudflare mode, we're connected once authenticated
-            console.log('Updating connection status element...');
-            const statusEl = document.getElementById('connectionStatus');
-            const dotEl = document.getElementById('connectionDot');
-            console.log('Status element found:', !!statusEl);
-            console.log('Dot element found:', !!dotEl);
-            if (statusEl) {
-                statusEl.textContent = 'CONNECTED';
-                console.log('Status updated to:', statusEl.textContent);
-            }
-            if (dotEl) {
-                dotEl.classList.add('connected');
-            }
+            document.getElementById('connectionStatus').textContent = 'CONNECTED';
+            document.getElementById('connectionDot').classList.add('connected');
         }
         
         // Load initial data - don't let this block the UI
@@ -2382,6 +2371,7 @@ class TuneForgeUltimate {
                         // Enable delete button after save
                         document.getElementById('deleteConversation').disabled = false;
                     }
+                }
             } catch (error) {
                 console.error('Failed to save conversation:', error);
                 if (!autoSave) alert('Failed to save conversation');
@@ -3678,8 +3668,15 @@ class TuneForgeUltimate {
 
 // Initialize when DOM is ready
 console.log('Setting up DOMContentLoaded listener');
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded fired, creating TuneForgeUltimate instance');
+console.log('Current readyState:', document.readyState);
+
+function initializeApp() {
+    if (window.tuneforge) {
+        console.log('App already initialized');
+        return;
+    }
+    
+    console.log('Initializing TuneForgeUltimate...');
     try {
         window.tuneforge = new TuneForgeUltimate();
         console.log('TuneForgeUltimate instance created successfully');
@@ -3692,6 +3689,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch (error) {
         console.error('Error creating TuneForgeUltimate:', error);
+        console.error('Stack trace:', error.stack);
+    }
+}
+
+// Multiple initialization strategies
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOM is already loaded
+    console.log('DOM already loaded, initializing immediately');
+    initializeApp();
+}
+
+// Fallback initialization
+window.addEventListener('load', () => {
+    console.log('Window load event fired');
+    if (!window.tuneforge) {
+        console.log('App not initialized yet, initializing now');
+        initializeApp();
     }
 });
 

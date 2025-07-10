@@ -13,7 +13,7 @@ const PUBLIC_PATHS = [
   '/style-bins.css',
   '/index.html',
   '/',
-  '/app-ultimate.js',
+  '/app.js',
   '/loom.js'
 ];
 
