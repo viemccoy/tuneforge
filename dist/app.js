@@ -2358,12 +2358,12 @@ class TuneForgeUltimate {
                 }
                 
                 if (!autoSave) {
-                        this.showNotification('Conversation saved to dataset');
-                        // Don't clear the conversation on manual save, just disable the save button
-                        document.getElementById('saveConversation').disabled = true;
-                        // Enable delete button after save
-                        document.getElementById('deleteConversation').disabled = false;
-                    }
+                    this.showNotification('Conversation saved to dataset');
+                    // Don't clear the conversation on manual save, just disable the save button
+                    document.getElementById('saveConversation').disabled = true;
+                    // Enable delete button after save
+                    document.getElementById('deleteConversation').disabled = false;
+                }
             } catch (error) {
                 console.error('Failed to save conversation:', error);
                 if (!autoSave) alert('Failed to save conversation');
