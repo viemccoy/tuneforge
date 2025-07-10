@@ -2363,7 +2363,6 @@ class TuneForgeUltimate {
                         // Enable delete button after save
                         document.getElementById('deleteConversation').disabled = false;
                     }
-                }
             } catch (error) {
                 console.error('Failed to save conversation:', error);
                 if (!autoSave) alert('Failed to save conversation');
