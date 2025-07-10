@@ -63,29 +63,37 @@ class TuneForgeUltimate {
     
     async checkAuth() {
         console.log('checkAuth() called');
+        console.log('isCloudflare:', this.isCloudflare);
+        console.log('hostname:', window.location.hostname);
         
         if (this.isCloudflare) {
             // Check if we have a session token
             const sessionToken = sessionStorage.getItem('tuneforge_session');
+            console.log('Session token from storage:', sessionToken);
             
             if (!sessionToken) {
                 // No token, redirect to login
+                console.log('No session token found, redirecting to login');
                 window.location.href = '/login.html';
                 return;
             }
             
             // Verify token is valid by trying to fetch bins
             try {
+                console.log('Verifying token by fetching bins...');
                 const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
+                console.log('Bins fetch response:', response.status);
                 
                 if (!response.ok) {
                     // Invalid token, redirect to login
+                    console.log('Invalid token (response not ok), redirecting to login');
                     sessionStorage.removeItem('tuneforge_session');
                     window.location.href = '/login.html';
                     return;
                 }
                 
                 // Valid session, proceed
+                console.log('Valid session, proceeding to initialize');
                 this.authenticated = true;
                 this.initialize();
                 
@@ -357,6 +365,7 @@ class TuneForgeUltimate {
     
     async initialize() {
         console.log('Initializing TuneForge Ultimate...');
+        console.log('Setting connection status to CONNECTED');
         
         // Initialize UI state
         document.querySelector('.app-container').classList.add('no-bin-selected');
@@ -371,8 +380,18 @@ class TuneForgeUltimate {
             this.initializeSocket();
         } else {
             // In Cloudflare mode, we're connected once authenticated
-            document.getElementById('connectionStatus').textContent = 'CONNECTED';
-            document.getElementById('connectionDot').classList.add('connected');
+            console.log('Updating connection status element...');
+            const statusEl = document.getElementById('connectionStatus');
+            const dotEl = document.getElementById('connectionDot');
+            console.log('Status element found:', !!statusEl);
+            console.log('Dot element found:', !!dotEl);
+            if (statusEl) {
+                statusEl.textContent = 'CONNECTED';
+                console.log('Status updated to:', statusEl.textContent);
+            }
+            if (dotEl) {
+                dotEl.classList.add('connected');
+            }
         }
         
         // Load initial data - don't let this block the UI
