@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Diagnostics</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #00ff00;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        pre {
+            background: #001100;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 TuneForge Complete Diagnostics</h1>
+    
+    <div class="section">
+        <h2>1. Current Page & Environment</h2>
+        <pre id="env"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>2. Session Storage Status</h2>
+        <pre id="session"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>3. Script Loading Test</h2>
+        <pre id="scripts"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>4. API Test Results</h2>
+        <button onclick="testAPI()">Test All APIs</button>
+        <pre id="api"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>5. Page Navigation Test</h2>
+        <button onclick="window.location.href='/login.html'">Go to Login</button>
+        <button onclick="window.location.href='/index.html'">Go to App</button>
+        <button onclick="window.location.href='/'">Go to Root</button>
+    </div>
+    
+    <div class="section">
+        <h2>6. Console Log</h2>
+        <pre id="console"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>7. Quick Actions</h2>
+        <button onclick="clearSession()">Clear Session</button>
+        <button onclick="createFakeSession()">Create Fake Session</button>
+        <button onclick="window.location.reload()">Reload Page</button>
+    </div>
+
+    <script>
+        // Capture console
+        const consoleEl = document.getElementById('console');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        function addToConsole(type, args) {
+            const time = new Date().toLocaleTimeString();
+            consoleEl.textContent += `[${time}] [${type}] ${args.join(' ')}\n`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole('LOG', args);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole('ERROR', args);
+        };
+        
+        // 1. Environment
+        const env = {
+            url: window.location.href,
+            hostname: window.location.hostname,
+            pathname: window.location.pathname,
+            protocol: window.location.protocol,
+            userAgent: navigator.userAgent,
+            isCloudflare: window.location.hostname.includes('pages.dev') || 
+                         window.location.hostname.includes('cloudflare') ||
+                         window.location.hostname.includes('tuneforge.sh'),
+            timestamp: new Date().toISOString()
+        };
+        document.getElementById('env').textContent = JSON.stringify(env, null, 2);
+        
+        // 2. Session
+        function updateSession() {
+            const session = {
+                token: sessionStorage.getItem('tuneforge_session'),
+                tokenLength: sessionStorage.getItem('tuneforge_session')?.length || 0,
+                allKeys: Object.keys(sessionStorage),
+                itemCount: sessionStorage.length
+            };
+            document.getElementById('session').textContent = JSON.stringify(session, null, 2);
+        }
+        updateSession();
+        
+        // 3. Scripts
+        async function testScripts() {
+            const scripts = {
+                appJsExists: false,
+                appJsUrl: null,
+                loomJsExists: false,
+                windowTuneforge: typeof window.tuneforge !== 'undefined',
+                errors: []
+            };
+            
+            try {
+                // Test if app.js loads
+                const appResponse = await fetch('/app.js');
+                scripts.appJsExists = appResponse.ok;
+                scripts.appJsUrl = appResponse.url;
+                
+                if (appResponse.ok) {
+                    const text = await appResponse.text();
+                    scripts.appJsSize = text.length;
+                    scripts.appJsFirstLine = text.split('\n')[0];
+                }
+                
+                // Test if loom.js loads
+                const loomResponse = await fetch('/loom.js');
+                scripts.loomJsExists = loomResponse.ok;
+                
+            } catch (error) {
+                scripts.errors.push(error.message);
+            }
+            
+            document.getElementById('scripts').textContent = JSON.stringify(scripts, null, 2);
+        }
+        testScripts();
+        
+        // 4. API Tests
+        async function testAPI() {
+            const apiEl = document.getElementById('api');
+            apiEl.textContent = 'Testing APIs...\n';
+            
+            const token = sessionStorage.getItem('tuneforge_session');
+            const tests = [
+                { name: 'Auth Check', url: '/api/auth', method: 'GET' },
+                { name: 'Session Test', url: '/api/session-test', method: 'GET' },
+                { name: 'Bins', url: '/api/bins-fixed', method: 'GET' },
+                { name: 'Login Page', url: '/login.html', method: 'GET' },
+                { name: 'Index Page', url: '/index.html', method: 'GET' },
+                { name: 'Root', url: '/', method: 'GET' }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    console.log(`Testing ${test.name}...`);
+                    const options = {
+                        method: test.method,
+                        headers: {}
+                    };
+                    
+                    if (token && test.url.startsWith('/api/')) {
+                        options.headers['X-Session-Token'] = token;
+                    }
+                    
+                    const response = await fetch(test.url, options);
+                    const result = {
+                        name: test.name,
+                        url: test.url,
+                        status: response.status,
+                        statusText: response.statusText,
+                        redirected: response.redirected,
+                        finalUrl: response.url,
+                        contentType: response.headers.get('content-type')
+                    };
+                    
+                    if (response.headers.get('content-type')?.includes('json')) {
+                        try {
+                            result.data = await response.json();
+                        } catch (e) {
+                            result.parseError = e.message;
+                        }
+                    }
+                    
+                    apiEl.textContent += JSON.stringify(result, null, 2) + '\n\n';
+                    
+                } catch (error) {
+                    apiEl.textContent += `ERROR in ${test.name}: ${error.message}\n\n`;
+                }
+            }
+        }
+        
+        // Helper functions
+        function clearSession() {
+            sessionStorage.clear();
+            updateSession();
+            alert('Session cleared!');
+        }
+        
+        function createFakeSession() {
+            sessionStorage.setItem('tuneforge_session', 'fake-session-' + Date.now());
+            updateSession();
+            alert('Fake session created!');
+        }
+        
+        // Auto-run some tests
+        setTimeout(() => {
+            console.log('Page loaded, running initial diagnostics...');
+            if (typeof window.tuneforge !== 'undefined') {
+                console.log('window.tuneforge exists!');
+            } else {
+                console.error('window.tuneforge does NOT exist');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
