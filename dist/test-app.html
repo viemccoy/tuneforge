@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test App.js</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
+        pre { background: #001100; padding: 10px; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+    </style>
+</head>
+<body>
+    <h1>Testing app.js Loading</h1>
+    
+    <h2>Console Output:</h2>
+    <pre id="console"></pre>
+    
+    <h2>Script Load Status:</h2>
+    <pre id="status"></pre>
+    
+    <script>
+        // Capture all console output
+        const consoleEl = document.getElementById('console');
+        const statusEl = document.getElementById('status');
+        
+        ['log', 'error', 'warn'].forEach(method => {
+            const original = console[method];
+            console[method] = function(...args) {
+                original.apply(console, args);
+                const time = new Date().toLocaleTimeString();
+                consoleEl.innerHTML += `<span class="${method === 'error' ? 'error' : ''}">[${time}] [${method.toUpperCase()}] ${args.join(' ')}</span>\n`;
+            };
+        });
+        
+        // Catch syntax errors
+        window.addEventListener('error', (e) => {
+            statusEl.innerHTML += `<span class="error">ERROR: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}</span>\n`;
+            statusEl.innerHTML += `<span class="error">Stack: ${e.error?.stack || 'No stack'}</span>\n`;
+        });
+        
+        console.log('Test page loaded, attempting to load app.js...');
+    </script>
+    
+    <!-- Try to load app.js -->
+    <script src="app.js" onerror="console.error('Failed to load app.js')"></script>
+    
+    <script>
+        // Check after a delay
+        setTimeout(() => {
+            statusEl.innerHTML += '\n--- Post-load checks ---\n';
+            statusEl.innerHTML += `window.tuneforge exists: ${typeof window.tuneforge !== 'undefined' ? 'YES' : 'NO'}\n`;
+            statusEl.innerHTML += `TuneForgeUltimate exists: ${typeof TuneForgeUltimate !== 'undefined' ? 'YES' : 'NO'}\n`;
+            
+            if (typeof window.tuneforge === 'undefined') {
+                statusEl.innerHTML += '\n<span class="error">PROBLEM: app.js loaded but window.tuneforge was not created!</span>\n';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
