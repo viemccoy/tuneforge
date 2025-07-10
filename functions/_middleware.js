@@ -9,7 +9,12 @@ const PUBLIC_PATHS = [
   '/login.js',
   '/style.css',
   '/style-ultimate.css',
-  '/style-loom.css'
+  '/style-loom.css',
+  '/style-bins.css',
+  '/index.html',
+  '/',
+  '/app-ultimate.js',
+  '/loom.js'
 ];
 
 // Export for all HTTP methods
@@ -31,32 +36,17 @@ export async function onRequest(context) {
     return next();
   }
   
-  // For root path and HTML pages, check authentication
+  // DISABLED: Server-side HTML auth check
+  // The app uses sessionStorage for auth which isn't sent to server
+  // Client-side JavaScript handles authentication
+  /*
   if (url.pathname === '/' || url.pathname.endsWith('.html')) {
-    // Skip login page
     if (url.pathname === '/login.html') {
       return next();
     }
-    
-    // Check for session
-    let sessionToken = request.headers.get('X-Session-Token');
-    if (!sessionToken) {
-      const cookie = request.headers.get('Cookie');
-      sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
-    }
-    
-    if (!sessionToken) {
-      console.log('[Root Middleware] No session for HTML page, redirecting to login');
-      return Response.redirect(new URL('/login.html', request.url).toString(), 302);
-    }
-    
-    // Verify session
-    const session = await env.SESSIONS.get(`session:${sessionToken}`, 'json');
-    if (!session) {
-      console.log('[Root Middleware] Invalid session for HTML page, redirecting to login');
-      return Response.redirect(new URL('/login.html', request.url).toString(), 302);
-    }
+    // ... auth check disabled ...
   }
+  */
   
   // For API routes, continue with existing logic
   if (!url.pathname.startsWith('/api/')) {
