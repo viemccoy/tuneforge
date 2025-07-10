@@ -173,7 +173,8 @@ class TuneForgeLogin {
                 
                 // Short delay for user feedback
                 setTimeout(() => {
-                    window.location.href = '/';
+                    // Explicitly redirect to index.html to ensure we get the app, not a default page
+                    window.location.href = '/index.html';
                 }, 500);
             } else {
                 errorEl.textContent = loginData.error || 'Login failed';

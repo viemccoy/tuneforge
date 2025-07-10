@@ -532,7 +532,18 @@
         </div>
     </div>
 
+    <script>
+        console.log('[INDEX.HTML] Page loaded, scripts about to load...');
+        console.log('[INDEX.HTML] Current URL:', window.location.href);
+        console.log('[INDEX.HTML] Session token:', sessionStorage.getItem('tuneforge_session'));
+    </script>
     <script src="loom.js?v=2"></script>
     <script src="app-ultimate.js?v=2"></script>
+    <script>
+        console.log('[INDEX.HTML] All scripts loaded');
+        setTimeout(() => {
+            console.log('[INDEX.HTML] After timeout - window.tuneforge:', window.tuneforge);
+        }, 1000);
+    </script>
 </body>
 </html>
