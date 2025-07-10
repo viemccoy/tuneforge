@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneForge - Redirecting...</title>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #00ff41;
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .message {
+            text-align: center;
+            font-size: 1.2rem;
+        }
+    </style>
+    <script>
+        // Immediate auth check and redirect
+        (function() {
+            const isCloudflare = window.location.hostname.includes('pages.dev') || 
+                              window.location.hostname.includes('cloudflare') ||
+                              window.location.hostname.includes('tuneforge.sh');
+            
+            if (isCloudflare) {
+                const sessionToken = sessionStorage.getItem('tuneforge_session');
+                if (!sessionToken) {
+                    window.location.replace('/login.html');
+                    return;
+                }
+            }
+            
+            // If we have a session or not in Cloudflare mode, redirect to main app
+            window.location.replace('/index-original.html');
+        })();
+    </script>
+    <noscript>
+        <meta http-equiv="refresh" content="0; url=/login.html">
+    </noscript>
+</head>
+<body>
+    <div class="message">
+        Checking authentication...
+    </div>
+</body>
+</html>

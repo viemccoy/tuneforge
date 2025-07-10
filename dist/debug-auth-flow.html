@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneForge Auth Debug</title>
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .log {
+            background: #111;
+            border: 1px solid #00ff41;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            color: #ff0041;
+            border-color: #ff0041;
+        }
+        .success {
+            color: #00ff41;
+            border-color: #00ff41;
+        }
+        .info {
+            color: #41a0ff;
+            border-color: #41a0ff;
+        }
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #00cc33;
+        }
+    </style>
+</head>
+<body>
+    <h1>TuneForge Authentication Flow Debug</h1>
+    
+    <div id="logs"></div>
+    
+    <div style="margin-top: 20px;">
+        <button onclick="checkEnvironment()">Check Environment</button>
+        <button onclick="checkSession()">Check Session</button>
+        <button onclick="testAuth()">Test Auth Endpoint</button>
+        <button onclick="clearSession()">Clear Session</button>
+        <button onclick="goToLogin()">Go to Login</button>
+        <button onclick="goToApp()">Go to App</button>
+    </div>
+    
+    <script>
+        const logsDiv = document.getElementById('logs');
+        
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            console.log(message);
+        }
+        
+        function checkEnvironment() {
+            log('=== Checking Environment ===');
+            log(`Current URL: ${window.location.href}`);
+            log(`Hostname: ${window.location.hostname}`);
+            log(`Protocol: ${window.location.protocol}`);
+            log(`Port: ${window.location.port || 'default'}`);
+            
+            const isCloudflare = window.location.hostname.includes('pages.dev') || 
+                              window.location.hostname.includes('cloudflare') ||
+                              window.location.hostname.includes('tuneforge.sh');
+            
+            log(`Is Cloudflare: ${isCloudflare}`, isCloudflare ? 'success' : 'info');
+            log(`API Base: ${isCloudflare ? '/api' : ''}`);
+        }
+        
+        function checkSession() {
+            log('=== Checking Session Storage ===');
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            
+            if (sessionToken) {
+                log(`Session token found: ${sessionToken.substring(0, 20)}...`, 'success');
+            } else {
+                log('No session token found', 'error');
+            }
+            
+            // Check all sessionStorage items
+            log('\nAll sessionStorage items:');
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                log(`  ${key}: ${value?.substring(0, 50)}...`);
+            }
+        }
+        
+        async function testAuth() {
+            log('=== Testing Auth Endpoint ===');
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            const apiBase = '/api';
+            
+            if (!sessionToken) {
+                log('No session token to test with', 'error');
+                return;
+            }
+            
+            try {
+                log(`Testing ${apiBase}/bins-fixed with token...`);
+                const response = await fetch(`${apiBase}/bins-fixed`, {
+                    headers: {
+                        'X-Session-Token': sessionToken,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log(`Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('Auth successful! Response:', 'success');
+                    log(JSON.stringify(data, null, 2));
+                } else {
+                    const error = await response.text();
+                    log(`Auth failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log(`Network error: ${error.message}`, 'error');
+            }
+        }
+        
+        function clearSession() {
+            log('=== Clearing Session ===');
+            sessionStorage.removeItem('tuneforge_session');
+            log('Session cleared', 'success');
+        }
+        
+        function goToLogin() {
+            log('Redirecting to login page...');
+            window.location.href = '/login.html';
+        }
+        
+        function goToApp() {
+            log('Redirecting to app...');
+            window.location.href = '/';
+        }
+        
+        // Run initial checks
+        checkEnvironment();
+        checkSession();
+    </script>
+</body>
+</html>
