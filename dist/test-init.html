@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneForge Init Test</title>
+</head>
+<body>
+    <h1>TuneForge Initialization Test</h1>
+    <div id="status">Loading...</div>
+    <div id="errors" style="color: red;"></div>
+    
+    <script>
+        // Capture any errors
+        window.addEventListener('error', function(e) {
+            document.getElementById('errors').innerHTML += '<p>Error: ' + e.message + ' at ' + e.filename + ':' + e.lineno + '</p>';
+        });
+        
+        // Test if scripts are loading
+        document.getElementById('status').innerHTML = 'Scripts loading...';
+    </script>
+    
+    <script src="loom.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        // Check after scripts load
+        setTimeout(function() {
+            const status = document.getElementById('status');
+            status.innerHTML = '<h2>Results:</h2>';
+            status.innerHTML += '<p>window.tuneforge exists: ' + (typeof window.tuneforge !== 'undefined') + '</p>';
+            status.innerHTML += '<p>TuneForgeUltimate exists: ' + (typeof TuneForgeUltimate !== 'undefined') + '</p>';
+            status.innerHTML += '<p>Loom exists: ' + (typeof Loom !== 'undefined') + '</p>';
+            
+            if (typeof window.tuneforge === 'undefined') {
+                status.innerHTML += '<p style="color: orange;">Trying manual initialization...</p>';
+                try {
+                    window.tuneforge = new TuneForgeUltimate();
+                    status.innerHTML += '<p style="color: green;">Manual init successful!</p>';
+                } catch (e) {
+                    status.innerHTML += '<p style="color: red;">Manual init failed: ' + e.message + '</p>';
+                    status.innerHTML += '<pre>' + e.stack + '</pre>';
+                }
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
