@@ -58,47 +58,20 @@ class TuneForgeUltimate {
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
-        this.checkAuth();
+        // Auth is now handled by server-side middleware
+        // Remove client-side auth check to prevent conflicts
+        // this.checkAuth();
+        this.initialize();
     }
     
-    async checkAuth() {
-        console.log('checkAuth() called');
+    async initialize() {
+        console.log('App initialization starting...');
         
-        if (this.isCloudflare) {
-            // Check if we have a session token
-            const sessionToken = sessionStorage.getItem('tuneforge_session');
-            
-            if (!sessionToken) {
-                // No token, redirect to login
-                window.location.href = '/login.html';
-                return;
-            }
-            
-            // Verify token is valid by trying to fetch bins
-            try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
-                
-                if (!response.ok) {
-                    // Invalid token, redirect to login
-                    sessionStorage.removeItem('tuneforge_session');
-                    window.location.href = '/login.html';
-                    return;
-                }
-                
-                // Valid session, proceed
-                this.authenticated = true;
-                this.initialize();
-                
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                sessionStorage.removeItem('tuneforge_session');
-                window.location.href = '/login.html';
-            }
-        } else {
-            // Socket.io mode - no auth needed
-            this.authenticated = true;
-            this.initialize();
-        }
+        // Set authenticated flag based on environment
+        this.authenticated = true; // Server-side middleware handles auth now
+        
+        // Start the actual app initialization
+        this.startApp();
     }
     
     // Add logout button handler
@@ -282,7 +255,7 @@ class TuneForgeUltimate {
                     this.authenticated = true;
                     this.hideAuthModal();
                     this.showUserInfo(createData.user);
-                    this.initialize();
+                    this.startApp();
                 } else {
                     errorEl.textContent = createData.error || 'Password creation failed';
                 }
@@ -316,7 +289,7 @@ class TuneForgeUltimate {
                     this.authenticated = true;
                     this.hideAuthModal();
                     this.showUserInfo(loginData.user);
-                    this.initialize();
+                    this.startApp();
                 } else {
                     errorEl.textContent = loginData.error || 'Invalid credentials';
                     passwordInput.value = '';
@@ -355,8 +328,8 @@ class TuneForgeUltimate {
         window.location.href = '/login.html';
     }
     
-    async initialize() {
-        console.log('Initializing TuneForge Ultimate...');
+    async startApp() {
+        console.log('Starting TuneForge Ultimate app...');
         
         // Initialize UI state
         document.querySelector('.app-container').classList.add('no-bin-selected');

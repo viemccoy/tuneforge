@@ -4,7 +4,12 @@ const PUBLIC_PATHS = [
   '/api/users', 
   '/api/test',
   '/api/auth-test',
-  '/api/session-test'
+  '/api/session-test',
+  '/login.html',
+  '/login.js',
+  '/style.css',
+  '/style-ultimate.css',
+  '/style-loom.css'
 ];
 
 // Export for all HTTP methods
@@ -14,14 +19,47 @@ export async function onRequest(context) {
   
   console.log('[Root Middleware] Request:', request.method, url.pathname);
   
-  // Skip non-API routes
-  if (!url.pathname.startsWith('/api/')) {
+  // Allow public paths
+  if (PUBLIC_PATHS.some(path => url.pathname.startsWith(path))) {
+    console.log('[Root Middleware] Public path, skipping auth');
     return next();
   }
   
-  // Skip public endpoints
-  if (PUBLIC_PATHS.includes(url.pathname)) {
-    console.log('[Root Middleware] Public path, skipping auth');
+  // Check authentication for all other routes (including root /)
+  // Skip auth check only for static assets
+  if (url.pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
+    return next();
+  }
+  
+  // For root path and HTML pages, check authentication
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    // Skip login page
+    if (url.pathname === '/login.html') {
+      return next();
+    }
+    
+    // Check for session
+    let sessionToken = request.headers.get('X-Session-Token');
+    if (!sessionToken) {
+      const cookie = request.headers.get('Cookie');
+      sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
+    }
+    
+    if (!sessionToken) {
+      console.log('[Root Middleware] No session for HTML page, redirecting to login');
+      return Response.redirect(new URL('/login.html', request.url).toString(), 302);
+    }
+    
+    // Verify session
+    const session = await env.SESSIONS.get(`session:${sessionToken}`, 'json');
+    if (!session) {
+      console.log('[Root Middleware] Invalid session for HTML page, redirecting to login');
+      return Response.redirect(new URL('/login.html', request.url).toString(), 302);
+    }
+  }
+  
+  // For API routes, continue with existing logic
+  if (!url.pathname.startsWith('/api/')) {
     return next();
   }
   
