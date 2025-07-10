@@ -58,7 +58,13 @@ class TuneForgeUltimate {
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
-        this.checkAuth();
+        console.log('Constructor complete, calling checkAuth...');
+        try {
+            this.checkAuth();
+        } catch (error) {
+            console.error('Error in checkAuth:', error);
+            console.error('Stack:', error.stack);
+        }
     }
     
     async checkAuth() {
@@ -3660,8 +3666,15 @@ class TuneForgeUltimate {
 
 // Initialize when DOM is ready
 console.log('Setting up DOMContentLoaded listener');
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded fired, creating TuneForgeUltimate instance');
+console.log('Current readyState:', document.readyState);
+
+function initializeApp() {
+    if (window.tuneforge) {
+        console.log('App already initialized');
+        return;
+    }
+    
+    console.log('Initializing TuneForgeUltimate...');
     try {
         window.tuneforge = new TuneForgeUltimate();
         console.log('TuneForgeUltimate instance created successfully');
@@ -3674,6 +3687,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch (error) {
         console.error('Error creating TuneForgeUltimate:', error);
+        console.error('Stack trace:', error.stack);
+    }
+}
+
+// Multiple initialization strategies
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOM is already loaded
+    console.log('DOM already loaded, initializing immediately');
+    initializeApp();
+}
+
+// Fallback initialization
+window.addEventListener('load', () => {
+    console.log('Window load event fired');
+    if (!window.tuneforge) {
+        console.log('App not initialized yet, initializing now');
+        initializeApp();
     }
 });
 

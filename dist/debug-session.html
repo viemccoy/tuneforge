@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Session Debug</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .info {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #00ff00;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TuneForge Session Debug</h1>
+    
+    <div class="info">
+        <h2>1. Session Storage</h2>
+        <p>Token: <span id="token">checking...</span></p>
+        <p>Token exists: <span id="tokenExists">checking...</span></p>
+    </div>
+    
+    <div class="info">
+        <h2>2. Location Info</h2>
+        <p>Hostname: <span id="hostname">checking...</span></p>
+        <p>Is Cloudflare: <span id="isCloudflare">checking...</span></p>
+    </div>
+    
+    <div class="info">
+        <h2>3. Test API Call</h2>
+        <button onclick="testAPI()">Test bins-fixed endpoint</button>
+        <p>Result: <span id="apiResult">not tested</span></p>
+    </div>
+    
+    <div class="info">
+        <h2>4. Console Output</h2>
+        <pre id="console"></pre>
+    </div>
+    
+    <div class="info">
+        <h2>Actions</h2>
+        <button onclick="clearSession()">Clear Session</button>
+        <button onclick="window.location.href='/login.html'">Go to Login</button>
+        <button onclick="window.location.href='/'">Go to App</button>
+    </div>
+
+    <script>
+        // Capture console logs
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            consoleDiv.textContent += '[LOG] ' + args.join(' ') + '\n';
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            consoleDiv.textContent += '[ERROR] ' + args.join(' ') + '\n';
+        };
+        
+        // Check session
+        const token = sessionStorage.getItem('tuneforge_session');
+        document.getElementById('token').textContent = token || 'none';
+        document.getElementById('tokenExists').textContent = token ? 'YES' : 'NO';
+        
+        // Check location
+        document.getElementById('hostname').textContent = window.location.hostname;
+        const isCloudflare = window.location.hostname.includes('pages.dev') || 
+                           window.location.hostname.includes('cloudflare') ||
+                           window.location.hostname.includes('tuneforge.sh');
+        document.getElementById('isCloudflare').textContent = isCloudflare ? 'YES' : 'NO';
+        
+        // Test API
+        async function testAPI() {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'testing...';
+            
+            try {
+                console.log('Testing API with token:', token);
+                const response = await fetch('/api/bins-fixed', {
+                    headers: {
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultEl.textContent = `SUCCESS - ${data.bins?.length || 0} bins found`;
+                    console.log('API test successful:', data);
+                } else {
+                    resultEl.textContent = `FAILED - Status ${response.status}`;
+                    const text = await response.text();
+                    console.error('API test failed:', text);
+                }
+            } catch (error) {
+                resultEl.textContent = `ERROR - ${error.message}`;
+                console.error('API test error:', error);
+            }
+        }
+        
+        function clearSession() {
+            sessionStorage.removeItem('tuneforge_session');
+            window.location.reload();
+        }
+        
+        // Auto-test if token exists
+        if (token) {
+            console.log('Token found, auto-testing API...');
+            setTimeout(testAPI, 500);
+        }
+    </script>
+</body>
+</html>
