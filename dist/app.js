@@ -58,20 +58,47 @@ class TuneForgeUltimate {
         
         this.apiBase = this.isCloudflare ? '/api' : '';
         
-        // Auth is now handled by server-side middleware
-        // Remove client-side auth check to prevent conflicts
-        // this.checkAuth();
-        this.initialize();
+        this.checkAuth();
     }
     
-    async initialize() {
-        console.log('App initialization starting...');
+    async checkAuth() {
+        console.log('checkAuth() called');
         
-        // Set authenticated flag based on environment
-        this.authenticated = true; // Server-side middleware handles auth now
-        
-        // Start the actual app initialization
-        this.startApp();
+        if (this.isCloudflare) {
+            // Check if we have a session token
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            
+            if (!sessionToken) {
+                // No token, redirect to login
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // Verify token is valid by trying to fetch bins
+            try {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed`);
+                
+                if (!response.ok) {
+                    // Invalid token, redirect to login
+                    sessionStorage.removeItem('tuneforge_session');
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                // Valid session, proceed
+                this.authenticated = true;
+                this.initialize();
+                
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                sessionStorage.removeItem('tuneforge_session');
+                window.location.href = '/login.html';
+            }
+        } else {
+            // Socket.io mode - no auth needed
+            this.authenticated = true;
+            this.initialize();
+        }
     }
     
     // Add logout button handler
@@ -255,7 +282,7 @@ class TuneForgeUltimate {
                     this.authenticated = true;
                     this.hideAuthModal();
                     this.showUserInfo(createData.user);
-                    this.startApp();
+                    this.initialize();
                 } else {
                     errorEl.textContent = createData.error || 'Password creation failed';
                 }
@@ -289,7 +316,7 @@ class TuneForgeUltimate {
                     this.authenticated = true;
                     this.hideAuthModal();
                     this.showUserInfo(loginData.user);
-                    this.startApp();
+                    this.initialize();
                 } else {
                     errorEl.textContent = loginData.error || 'Invalid credentials';
                     passwordInput.value = '';
@@ -311,31 +338,6 @@ class TuneForgeUltimate {
         document.getElementById('userTeam').textContent = `[${user.teamId}]`;
     }
     
-    async fetchUserInfo() {
-        try {
-            const sessionToken = sessionStorage.getItem('tuneforge_session');
-            if (!sessionToken) return;
-            
-            // Try to get user info from session test endpoint
-            const response = await fetch(`${this.apiBase}/session-test`, {
-                headers: {
-                    'X-Session-Token': sessionToken,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.session && data.user) {
-                    this.currentUser = data.user;
-                    this.showUserInfo(data.user);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to fetch user info:', error);
-        }
-    }
-    
     async logout() {
         try {
             // Clear stored session
@@ -353,8 +355,8 @@ class TuneForgeUltimate {
         window.location.href = '/login.html';
     }
     
-    async startApp() {
-        console.log('Starting TuneForge Ultimate app...');
+    async initialize() {
+        console.log('Initializing TuneForge Ultimate...');
         
         // Initialize UI state
         document.querySelector('.app-container').classList.add('no-bin-selected');
@@ -371,9 +373,6 @@ class TuneForgeUltimate {
             // In Cloudflare mode, we're connected once authenticated
             document.getElementById('connectionStatus').textContent = 'CONNECTED';
             document.getElementById('connectionDot').classList.add('connected');
-            
-            // Fetch and display user info
-            await this.fetchUserInfo();
         }
         
         // Load initial data - don't let this block the UI
@@ -2308,63 +2307,63 @@ class TuneForgeUltimate {
                 
                 const savedConv = await response.json();
                     
-                if (isNewConversation) {
-                    this.currentConversationId = savedConv.id;
-                    
-                    // Remove placeholder if it exists
-                    const placeholderIndex = this.conversations.findIndex(c => 
-                        c.metadata?.isPlaceholder && c.name === this.currentConversationName
-                    );
-                    if (placeholderIndex > -1) {
-                        // Replace placeholder with real conversation
-                        this.conversations[placeholderIndex] = savedConv;
-                        // Don't increment count since we already did when creating placeholder
-                    } else {
-                        // No placeholder, this is a direct save
-                        this.conversations.push(savedConv);
-                        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
-                    }
-                    
-                    // Enable delete button for new conversation
-                    document.getElementById('deleteConversation').disabled = false;
-                } else {
-                    // Update existing conversation in list
-                    const index = this.conversations.findIndex(c => c.id === conversationId);
-                    if (index > -1) {
-                        this.conversations[index] = savedConv;
-                    }
-                }
-                
-                this.updateStats();
-                    
-                // Update the conversation in the UI
-                if (this.currentBin) {
                     if (isNewConversation) {
-                        // Update bin count in UI immediately
-                        this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                        this.currentConversationId = savedConv.id;
                         
-                        // Ensure bin is expanded to show new conversation
-                        const convList = document.getElementById(`convList-${this.currentBin.id}`);
-                        if (convList && convList.style.display === 'none') {
-                            await this.toggleBinExpanded(this.currentBin.id);
+                        // Remove placeholder if it exists
+                        const placeholderIndex = this.conversations.findIndex(c => 
+                            c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                        );
+                        if (placeholderIndex > -1) {
+                            // Replace placeholder with real conversation
+                            this.conversations[placeholderIndex] = savedConv;
+                            // Don't increment count since we already did when creating placeholder
                         } else {
-                            // For new conversations, reload the list to add it
-                            await this.loadConversationsForBin(this.currentBin.id);
+                            // No placeholder, this is a direct save
+                            this.conversations.push(savedConv);
+                            this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
                         }
+                        
+                        // Enable delete button for new conversation
+                        document.getElementById('deleteConversation').disabled = false;
                     } else {
-                        // For existing conversations, just update the name and turn count
-                        this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
+                        // Update existing conversation in list
+                        const index = this.conversations.findIndex(c => c.id === conversationId);
+                        if (index > -1) {
+                            this.conversations[index] = savedConv;
+                        }
+                    }
+                    
+                    this.updateStats();
+                    
+                    // Update the conversation in the UI
+                    if (this.currentBin) {
+                        if (isNewConversation) {
+                            // Update bin count in UI immediately
+                            this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
+                            
+                            // Ensure bin is expanded to show new conversation
+                            const convList = document.getElementById(`convList-${this.currentBin.id}`);
+                            if (convList && convList.style.display === 'none') {
+                                await this.toggleBinExpanded(this.currentBin.id);
+                            } else {
+                                // For new conversations, reload the list to add it
+                                await this.loadConversationsForBin(this.currentBin.id);
+                            }
+                        } else {
+                            // For existing conversations, just update the name and turn count
+                            this.updateConversationNameInLists(conversationId, savedConv.name || this.currentConversationName);
+                        }
+                    }
+                    
+                    if (!autoSave) {
+                        this.showNotification('Conversation saved to dataset');
+                        // Don't clear the conversation on manual save, just disable the save button
+                        document.getElementById('saveConversation').disabled = true;
+                        // Enable delete button after save
+                        document.getElementById('deleteConversation').disabled = false;
                     }
                 }
-                
-                if (!autoSave) {
-                    this.showNotification('Conversation saved to dataset');
-                    // Don't clear the conversation on manual save, just disable the save button
-                    document.getElementById('saveConversation').disabled = true;
-                    // Enable delete button after save
-                    document.getElementById('deleteConversation').disabled = false;
-                }
-                
             } catch (error) {
                 console.error('Failed to save conversation:', error);
                 if (!autoSave) alert('Failed to save conversation');
