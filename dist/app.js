@@ -1,5 +1,6 @@
 // TuneForge Ultimate - Combining Original Power with Bin Management
-console.log('TuneForge Ultimate script loaded');
+// Version: Fixed syntax errors - deployed at: ${new Date().toISOString()}
+console.log('TuneForge Ultimate script loaded - v2');
 console.log('Script URL:', document.currentScript?.src || 'inline');
 console.log('Page URL:', window.location.href);
 
