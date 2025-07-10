@@ -2309,29 +2309,29 @@ class TuneForgeUltimate {
                 const savedConv = await response.json();
                     
                 if (isNewConversation) {
-                        this.currentConversationId = savedConv.id;
-                        
-                        // Remove placeholder if it exists
-                        const placeholderIndex = this.conversations.findIndex(c => 
-                            c.metadata?.isPlaceholder && c.name === this.currentConversationName
-                        );
-                        if (placeholderIndex > -1) {
-                            // Replace placeholder with real conversation
-                            this.conversations[placeholderIndex] = savedConv;
+                    this.currentConversationId = savedConv.id;
+                    
+                    // Remove placeholder if it exists
+                    const placeholderIndex = this.conversations.findIndex(c => 
+                        c.metadata?.isPlaceholder && c.name === this.currentConversationName
+                    );
+                    if (placeholderIndex > -1) {
+                        // Replace placeholder with real conversation
+                        this.conversations[placeholderIndex] = savedConv;
                         // Don't increment count since we already did when creating placeholder
                     } else {
-                            // No placeholder, this is a direct save
-                            this.conversations.push(savedConv);
-                            this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
-                        }
-                        
-                        // Enable delete button for new conversation
+                        // No placeholder, this is a direct save
+                        this.conversations.push(savedConv);
+                        this.currentBin.conversationCount = (this.currentBin.conversationCount || 0) + 1;
+                    }
+                    
+                    // Enable delete button for new conversation
                     document.getElementById('deleteConversation').disabled = false;
                 } else {
                     // Update existing conversation in list
-                        const index = this.conversations.findIndex(c => c.id === conversationId);
-                        if (index > -1) {
-                            this.conversations[index] = savedConv;
+                    const index = this.conversations.findIndex(c => c.id === conversationId);
+                    if (index > -1) {
+                        this.conversations[index] = savedConv;
                     }
                 }
                 
@@ -2339,10 +2339,10 @@ class TuneForgeUltimate {
                     
                 // Update the conversation in the UI
                 if (this.currentBin) {
-                        if (isNewConversation) {
+                    if (isNewConversation) {
                         // Update bin count in UI immediately
                         this.updateBinCount(this.currentBin.id, this.currentBin.conversationCount);
-                            
+                        
                         // Ensure bin is expanded to show new conversation
                         const convList = document.getElementById(`convList-${this.currentBin.id}`);
                         if (convList && convList.style.display === 'none') {
