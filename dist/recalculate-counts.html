@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recalculate Conversation Counts</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 40px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        pre {
+            background: #001100;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .fix-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 255, 65, 0.1);
+            border-left: 3px solid #00ff00;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Recalculate Conversation Counts</h1>
+    
+    <div class="section">
+        <h2>What This Does</h2>
+        <p>This tool recalculates the conversation count for all bins by:</p>
+        <ul>
+            <li>Scanning conversations with binId prefix (original format)</li>
+            <li>Scanning conversations with binId field (new format)</li>
+            <li>Updating the conversationCount field in each bin</li>
+            <li>Fixing any discrepancies found</li>
+        </ul>
+        <p class="warning">⚠️ This operation is only available to vie@morpheus.systems</p>
+    </div>
+    
+    <button onclick="recalculateCounts()">🔄 Recalculate All Counts</button>
+    
+    <div id="results" class="section" style="display: none;">
+        <h2>Results</h2>
+        <div id="resultsContent"></div>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        async function recalculateCounts() {
+            const resultsEl = document.getElementById('results');
+            const contentEl = document.getElementById('resultsContent');
+            
+            resultsEl.style.display = 'block';
+            contentEl.innerHTML = '<div class="loading">Recalculating conversation counts...</div>';
+            
+            try {
+                const response = await fetch('/api/recalculate-counts', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    contentEl.innerHTML = `<div class="error">Error: ${data.error || 'Failed to recalculate'}</div>`;
+                    return;
+                }
+                
+                // Display results
+                let html = `<div class="success">✓ Successfully recalculated counts for ${data.totalBins} bins</div>`;
+                html += `<p>Total conversations found: ${data.totalConversations}</p>`;
+                
+                if (data.fixes && data.fixes.length > 0) {
+                    html += '<h3>Fixed Bins:</h3>';
+                    data.fixes.forEach(fix => {
+                        const diff = fix.difference > 0 ? `+${fix.difference}` : fix.difference;
+                        html += `<div class="fix-item">`;
+                        html += `<strong>${fix.bin}</strong><br>`;
+                        html += `Old count: ${fix.oldCount} → New count: ${fix.newCount} (${diff})`;
+                        html += `</div>`;
+                    });
+                } else {
+                    html += '<p class="success">✓ All conversation counts were already correct!</p>';
+                }
+                
+                html += '<details style="margin-top: 20px;">';
+                html += '<summary>Full Details (click to expand)</summary>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                html += '</details>';
+                
+                contentEl.innerHTML = html;
+                
+            } catch (error) {
+                contentEl.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Check if user is authorized on load
+        window.addEventListener('load', async () => {
+            if (!token) {
+                document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Please log in first</div>';
+                return;
+            }
+            
+            // Verify user is vie@morpheus.systems
+            try {
+                const response = await fetch('/api/session-test', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const data = await response.json();
+                
+                if (!data.user || data.user.email !== 'vie@morpheus.systems') {
+                    document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Access denied. This tool is only available to vie@morpheus.systems</div>';
+                }
+            } catch (error) {
+                document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Failed to verify authorization</div>';
+            }
+        });
+    </script>
+</body>
+</html>

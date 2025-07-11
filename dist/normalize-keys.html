@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Normalize Keys</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 40px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        pre {
+            background: #001100;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .stat-item {
+            display: inline-block;
+            margin: 10px 20px;
+            padding: 10px;
+            background: rgba(0, 255, 65, 0.1);
+            border-radius: 5px;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Normalize Key Formats</h1>
+    
+    <div class="section">
+        <h2>What This Does</h2>
+        <p>This tool standardizes all key formats in the system:</p>
+        <ul>
+            <li><strong>Bins:</strong> Ensures all bins use the format <code>bin:teamId:binId</code></li>
+            <li><strong>Conversations:</strong> Ensures all conversations have <code>binId</code> and <code>id</code> fields</li>
+            <li><strong>Teams:</strong> Assigns orphaned bins to morpheus-systems team</li>
+            <li><strong>Counts:</strong> Recalculates all conversation counts after normalization</li>
+        </ul>
+        <p class="warning">⚠️ This operation is only available to vie@morpheus.systems</p>
+        <p class="warning">⚠️ This will modify KV storage structure - make sure you have backups!</p>
+    </div>
+    
+    <button onclick="normalizeKeys()">🔄 Normalize All Keys</button>
+    
+    <div id="results" class="section" style="display: none;">
+        <h2>Results</h2>
+        <div id="resultsContent"></div>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        async function normalizeKeys() {
+            const resultsEl = document.getElementById('results');
+            const contentEl = document.getElementById('resultsContent');
+            
+            if (!confirm('This will normalize all keys in the system. Are you sure you want to proceed?')) {
+                return;
+            }
+            
+            resultsEl.style.display = 'block';
+            contentEl.innerHTML = '<div class="loading">Normalizing keys... This may take a while...</div>';
+            
+            try {
+                const response = await fetch('/api/normalize-keys', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    contentEl.innerHTML = `<div class="error">Error: ${data.error || 'Failed to normalize'}</div>`;
+                    return;
+                }
+                
+                // Display results
+                let html = '<div class="success">✓ Key normalization complete!</div>';
+                
+                // Bins stats
+                html += '<h3>Bins:</h3>';
+                html += '<div class="stat-item">Processed: ' + data.results.bins.processed + '</div>';
+                html += '<div class="stat-item">Normalized: ' + data.results.bins.normalized + '</div>';
+                if (data.results.bins.errors.length > 0) {
+                    html += '<div class="stat-item error">Errors: ' + data.results.bins.errors.length + '</div>';
+                }
+                
+                // Conversations stats
+                html += '<h3>Conversations:</h3>';
+                html += '<div class="stat-item">Processed: ' + data.results.conversations.processed + '</div>';
+                html += '<div class="stat-item">Normalized: ' + data.results.conversations.normalized + '</div>';
+                if (data.results.conversations.errors.length > 0) {
+                    html += '<div class="stat-item error">Errors: ' + data.results.conversations.errors.length + '</div>';
+                }
+                
+                // Recalculation results
+                if (data.recalculation) {
+                    html += '<h3>Conversation Count Recalculation:</h3>';
+                    html += '<div class="stat-item">Bins Updated: ' + data.recalculation.binsUpdated + '</div>';
+                    html += '<div class="stat-item">Total Conversations: ' + data.recalculation.totalConversations + '</div>';
+                }
+                
+                // Show errors if any
+                if (data.results.bins.errors.length > 0 || data.results.conversations.errors.length > 0) {
+                    html += '<h3 class="error">Errors:</h3>';
+                    html += '<pre class="error">';
+                    if (data.results.bins.errors.length > 0) {
+                        html += 'Bin errors:\n' + JSON.stringify(data.results.bins.errors, null, 2) + '\n\n';
+                    }
+                    if (data.results.conversations.errors.length > 0) {
+                        html += 'Conversation errors:\n' + JSON.stringify(data.results.conversations.errors, null, 2);
+                    }
+                    html += '</pre>';
+                }
+                
+                html += '<details style="margin-top: 20px;">';
+                html += '<summary>Full Details (click to expand)</summary>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                html += '</details>';
+                
+                contentEl.innerHTML = html;
+                
+            } catch (error) {
+                contentEl.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Check if user is authorized on load
+        window.addEventListener('load', async () => {
+            if (!token) {
+                document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Please log in first</div>';
+                return;
+            }
+            
+            // Verify user is vie@morpheus.systems
+            try {
+                const response = await fetch('/api/session-test', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const data = await response.json();
+                
+                if (!data.user || data.user.email !== 'vie@morpheus.systems') {
+                    document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Access denied. This tool is only available to vie@morpheus.systems</div>';
+                }
+            } catch (error) {
+                document.body.innerHTML = '<div class="error" style="text-align: center; margin-top: 100px;">Failed to verify authorization</div>';
+            }
+        });
+    </script>
+</body>
+</html>
