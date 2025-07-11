@@ -574,8 +574,13 @@ class TuneForgeUltimate {
                 <span class="folder-icon">&gt;</span>
                 <span class="bin-name">${this.escapeHtml(bin.name)}</span>
                 <span class="bin-count">${bin.conversationCount || 0}</span>
+                <button class="bin-settings-btn" title="Bin Settings">⚙️</button>
             `;
             binHeader.addEventListener('click', async (e) => {
+                // Don't handle clicks on the settings button
+                if (e.target.classList.contains('bin-settings-btn')) {
+                    return;
+                }
                 e.stopPropagation();
                 
                 // Select the bin if it's not already selected
@@ -585,6 +590,13 @@ class TuneForgeUltimate {
                     // If already selected, just toggle expansion
                     this.toggleBinExpanded(bin.id);
                 }
+            });
+            
+            // Settings button event listener
+            const settingsBtn = binHeader.querySelector('.bin-settings-btn');
+            settingsBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.showBinSettings(bin);
             });
             
             // Conversation list (nested)
@@ -2971,6 +2983,108 @@ class TuneForgeUltimate {
                 }
             });
         });
+    }
+    
+    // Bin settings modal
+    async showBinSettings(bin) {
+        try {
+            // Get current settings
+            const response = await this.fetchWithAuth(`${this.apiBase}/bin-settings?binId=${bin.id}`);
+            if (!response.ok) {
+                throw new Error('Failed to load bin settings');
+            }
+            
+            const settings = await response.json();
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-overlay active';
+            
+            modal.innerHTML = `
+                <div class="confirm-modal settings-modal">
+                    <div class="confirm-header">
+                        <h3>Bin Settings: ${this.escapeHtml(bin.name)}</h3>
+                        <div class="confirm-glow"></div>
+                    </div>
+                    <div class="confirm-body">
+                        <div class="settings-section">
+                            <h4>Visibility</h4>
+                            <div class="visibility-options">
+                                <label class="radio-label">
+                                    <input type="radio" name="visibility" value="personal" 
+                                           ${settings.visibility === 'personal' ? 'checked' : ''}
+                                           ${!settings.canEdit ? 'disabled' : ''}>
+                                    <span class="radio-text">Personal</span>
+                                    <span class="radio-desc">Only visible to you</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="visibility" value="team" 
+                                           ${settings.visibility === 'team' ? 'checked' : ''}
+                                           ${!settings.canEdit ? 'disabled' : ''}>
+                                    <span class="radio-text">Team</span>
+                                    <span class="radio-desc">Visible to all team members</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-info">
+                            <p>Created by: ${this.escapeHtml(settings.createdBy)}</p>
+                            <p>Team: ${this.escapeHtml(settings.teamId)}</p>
+                            ${!settings.canEdit ? '<p class="warning">You can only edit bins you created.</p>' : ''}
+                        </div>
+                    </div>
+                    <div class="confirm-actions">
+                        <button id="settingsSave" class="confirm-button confirm" ${!settings.canEdit ? 'disabled' : ''}>SAVE</button>
+                        <button id="settingsCancel" class="confirm-button cancel">CANCEL</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const cleanup = () => {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            };
+            
+            // Handle save
+            document.getElementById('settingsSave').addEventListener('click', async () => {
+                const selectedVisibility = modal.querySelector('input[name="visibility"]:checked').value;
+                
+                try {
+                    const updateResponse = await this.fetchWithAuth(`${this.apiBase}/bin-settings?binId=${bin.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visibility: selectedVisibility })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error('Failed to update settings');
+                    }
+                    
+                    // Update local bin data
+                    bin.visibility = selectedVisibility;
+                    
+                    // Reload bins to reflect visibility changes
+                    await this.loadBins();
+                    
+                    this.showSystemMessage('Bin settings updated successfully', 'success');
+                    cleanup();
+                } catch (error) {
+                    console.error('Error updating bin settings:', error);
+                    this.showSystemMessage('Failed to update settings: ' + error.message, 'error');
+                }
+            });
+            
+            // Handle cancel
+            document.getElementById('settingsCancel').addEventListener('click', cleanup);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) cleanup();
+            });
+            
+        } catch (error) {
+            console.error('Error showing bin settings:', error);
+            this.showSystemMessage('Failed to load bin settings: ' + error.message, 'error');
+        }
     }
     
     // Loading overlay system

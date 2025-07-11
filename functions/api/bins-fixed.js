@@ -50,14 +50,26 @@ export async function onRequestGet(context) {
     for (const key of keys) {
       const bin = await env.BINS.get(key.name, 'json');
       if (bin) {
+        // Check visibility settings
+        const visibility = bin.visibility || 'team'; // Default to team visibility
+        
         // Include bin if:
-        // 1. It belongs to user's team
-        // 2. It has no team (orphaned) and was created by user
-        // 3. It's an old bin without team assignment
-        if (bin.teamId === user.teamId || 
-            (!bin.teamId && bin.createdBy === user.email) ||
-            (!bin.teamId && !bin.createdBy)) {
-          userBins.push(bin);
+        // 1. Personal bin created by user
+        // 2. Team bin that belongs to user's team
+        // 3. Old bin without team assignment (legacy support)
+        
+        if (visibility === 'personal') {
+          // Personal bins are only visible to creator
+          if (bin.createdBy === user.email) {
+            userBins.push(bin);
+          }
+        } else if (visibility === 'team') {
+          // Team bins are visible to all team members
+          if (bin.teamId === user.teamId || 
+              (!bin.teamId && bin.createdBy === user.email) ||
+              (!bin.teamId && !bin.createdBy)) {
+            userBins.push(bin);
+          }
         }
       }
     }
@@ -118,7 +130,8 @@ export async function onRequestPost(context) {
       createdAt: new Date().toISOString(),
       conversationCount: 0,
       tokenCount: 0,
-      models: []
+      models: [],
+      visibility: 'team' // Default to team visibility
     };
     
     await env.BINS.put(`bin:${user.teamId}:${binId}`, JSON.stringify(bin));

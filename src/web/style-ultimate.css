@@ -223,6 +223,29 @@
     border: 1px solid var(--border-color);
 }
 
+/* Bin settings button */
+.bin-settings-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 0.2rem 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.bin-settings-btn:hover {
+    opacity: 1;
+    color: var(--matrix-green);
+    border-color: var(--matrix-green-dim);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.bin-folder.active .bin-settings-btn {
+    opacity: 0.8;
+}
+
 /* Nested conversation list */
 .conversation-list.nested {
     padding: 0 0 0.5rem 1.5rem;
@@ -491,6 +514,127 @@
 .btn-confirm:hover {
     background: var(--matrix-green);
     box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+}
+
+/* Settings modal specific styles */
+.settings-modal {
+    min-width: 500px;
+}
+
+.settings-section {
+    margin-bottom: 1.5rem;
+}
+
+.settings-section h4 {
+    color: var(--matrix-green);
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.visibility-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.radio-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-label:hover {
+    border-color: var(--matrix-green-dim);
+    background: rgba(0, 255, 65, 0.05);
+}
+
+.radio-label input[type="radio"] {
+    margin-top: 0.2rem;
+    accent-color: var(--matrix-green);
+}
+
+.radio-label input[type="radio"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.radio-label:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.radio-label:has(input:checked) {
+    border-color: var(--matrix-green);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.radio-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    display: block;
+}
+
+.radio-desc {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    display: block;
+    margin-top: 0.2rem;
+}
+
+.settings-info {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.settings-info p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.settings-info .warning {
+    color: var(--warning-color);
+    font-style: italic;
+}
+
+.confirm-button {
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--matrix-green);
+    background: transparent;
+    color: var(--matrix-green);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.confirm-button:hover:not(:disabled) {
+    background: var(--matrix-green);
+    color: var(--bg-primary);
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+}
+
+.confirm-button.confirm {
+    background: var(--matrix-green-dim);
+    color: var(--bg-primary);
+}
+
+.confirm-button.cancel {
+    background: transparent;
+}
+
+.confirm-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .btn-danger {
