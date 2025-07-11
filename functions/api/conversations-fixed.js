@@ -100,17 +100,37 @@ export async function onRequestGet(context) {
     }
     
     // List conversations for this bin
+    // Method 1: Look for conversations with binId prefix (original format)
     const list = await env.CONVERSATIONS.list({ prefix: `${binId}:` });
     const conversations = [];
+    const foundIds = new Set();
     
     for (const key of list.keys) {
       const convData = await env.CONVERSATIONS.get(key.name, 'json');
       if (convData) {
+        const convId = key.name.split(':')[1] || convData.id;
         conversations.push({
-          id: key.name.split(':')[1],
+          id: convId,
           binId: binId,
           ...convData
         });
+        foundIds.add(convId);
+      }
+    }
+    
+    // Method 2: If we didn't find any (or found few), scan all conversations for binId field
+    if (conversations.length < bin.conversationCount) {
+      const allList = await env.CONVERSATIONS.list({ limit: 1000 });
+      
+      for (const key of allList.keys) {
+        const convData = await env.CONVERSATIONS.get(key.name, 'json');
+        if (convData && convData.binId === binId && !foundIds.has(convData.id)) {
+          conversations.push({
+            id: convData.id || key.name,
+            binId: binId,
+            ...convData
+          });
+        }
       }
     }
     

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Conversation Loading</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .bin {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+        }
+        .conversations {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        pre {
+            background: #001100;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <h1>Test Conversation Loading</h1>
+    
+    <button onclick="testAll()">Test All Bins</button>
+    <button onclick="diagnoseAll()">Run Full Diagnosis</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        async function testAll() {
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML = '<p>Loading bins...</p>';
+            
+            try {
+                // Get all bins
+                const binsResp = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const binsData = await binsResp.json();
+                
+                if (!binsData.bins) {
+                    resultsEl.innerHTML = '<p class="error">No bins found!</p>';
+                    return;
+                }
+                
+                resultsEl.innerHTML = '';
+                
+                // Test each bin
+                for (const bin of binsData.bins) {
+                    const binDiv = document.createElement('div');
+                    binDiv.className = 'bin';
+                    binDiv.innerHTML = `
+                        <h3>${bin.name} (${bin.id})</h3>
+                        <p>Expected conversations: ${bin.conversationCount}</p>
+                        <div class="conversations" id="conv-${bin.id}">Loading...</div>
+                    `;
+                    resultsEl.appendChild(binDiv);
+                    
+                    // Load conversations
+                    try {
+                        const convResp = await fetch(`/api/conversations-fixed?binId=${bin.id}`, {
+                            headers: { 'X-Session-Token': token }
+                        });
+                        const convData = await convResp.json();
+                        
+                        const convDiv = document.getElementById(`conv-${bin.id}`);
+                        if (convData.conversations && convData.conversations.length > 0) {
+                            convDiv.innerHTML = `<p class="success">Found ${convData.conversations.length} conversations:</p>`;
+                            const list = document.createElement('ul');
+                            convData.conversations.forEach(conv => {
+                                const li = document.createElement('li');
+                                li.textContent = `${conv.name || 'Untitled'} (${conv.messages?.length || 0} messages)`;
+                                list.appendChild(li);
+                            });
+                            convDiv.appendChild(list);
+                        } else {
+                            convDiv.innerHTML = `<p class="warning">No conversations found (API returned: ${JSON.stringify(convData)})</p>`;
+                        }
+                    } catch (error) {
+                        document.getElementById(`conv-${bin.id}`).innerHTML = `<p class="error">Error: ${error.message}</p>`;
+                    }
+                }
+            } catch (error) {
+                resultsEl.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function diagnoseAll() {
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML = '<p>Running diagnosis...</p>';
+            
+            try {
+                // Get bins
+                const binsResp = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const binsData = await binsResp.json();
+                
+                resultsEl.innerHTML = '<h2>Diagnosis Results</h2>';
+                
+                for (const bin of binsData.bins || []) {
+                    const diagResp = await fetch(`/api/diagnose-conversations?binId=${bin.id}`, {
+                        headers: { 'X-Session-Token': token }
+                    });
+                    const diagData = await diagResp.json();
+                    
+                    const binDiv = document.createElement('div');
+                    binDiv.className = 'bin';
+                    binDiv.innerHTML = `
+                        <h3>${bin.name}</h3>
+                        <p>Bin ID: <code>${bin.id}</code></p>
+                        <p>Expected: ${bin.conversationCount} conversations</p>
+                        <p>Found by binId field: ${diagData.analysis?.foundByBinId || 0}</p>
+                        <p>Found by key prefix: ${diagData.analysis?.foundByKeyPrefix || 0}</p>
+                        <details>
+                            <summary>Full diagnosis data</summary>
+                            <pre>${JSON.stringify(diagData, null, 2)}</pre>
+                        </details>
+                    `;
+                    resultsEl.appendChild(binDiv);
+                }
+            } catch (error) {
+                resultsEl.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Auto-run test on load
+        testAll();
+    </script>
+</body>
+</html>
