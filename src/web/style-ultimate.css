@@ -228,11 +228,13 @@
     background: transparent;
     border: 1px solid transparent;
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    padding: 0.1rem 0.3rem;
     cursor: pointer;
     transition: all 0.2s ease;
     opacity: 0.6;
+    letter-spacing: -1px;
 }
 
 .bin-settings-btn:hover {

@@ -574,7 +574,7 @@ class TuneForgeUltimate {
                 <span class="folder-icon">&gt;</span>
                 <span class="bin-name">${this.escapeHtml(bin.name)}</span>
                 <span class="bin-count">${bin.conversationCount || 0}</span>
-                <button class="bin-settings-btn" title="Bin Settings">⚙️</button>
+                <button class="bin-settings-btn" title="Bin Settings">[...]</button>
             `;
             binHeader.addEventListener('click', async (e) => {
                 // Don't handle clicks on the settings button
