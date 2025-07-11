@@ -96,6 +96,10 @@ class TuneForgeUltimate {
                 
                 // Valid session, proceed
                 this.authenticated = true;
+                
+                // Fetch and display user info
+                await this.fetchAndDisplayUserInfo();
+                
                 this.initialize();
                 
             } catch (error) {
@@ -178,6 +182,21 @@ class TuneForgeUltimate {
     async authenticate() {
         // Redirect to login page
         window.location.href = '/login.html';
+    }
+    
+    async fetchAndDisplayUserInfo() {
+        try {
+            const response = await this.fetchWithAuth(`${this.apiBase}/session-test`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.user) {
+                    this.showUserInfo(data.user);
+                    this.currentUser = data.user;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch user info:', error);
+        }
     }
     
     showUserInfo(user) {
@@ -974,6 +993,7 @@ class TuneForgeUltimate {
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
                 { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
                 { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
+                { id: 'x-ai/grok-4', name: 'Grok 4', provider: 'openrouter' },
                 { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
             ];
         } else {

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Migration Fix</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #001100;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        .spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner.active {
+            display: block;
+        }
+        .spinner::after {
+            content: "⚡";
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            font-size: 30px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .summary {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .stat-label {
+            color: #aaa;
+        }
+        .stat-value {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 TuneForge Migration Fix</h1>
+    
+    <div class="section">
+        <h2>What This Tool Does</h2>
+        <p>This tool fixes migration issues including:</p>
+        <ul>
+            <li>✓ Bins with undefined IDs (like "bin:morpheus-systems:undefined")</li>
+            <li>✓ Orphaned conversations that can't find their bins</li>
+            <li>✓ Missing bin-conversation links</li>
+            <li>✓ Team assignments for legacy bins</li>
+        </ul>
+        <p class="warning">⚠️ Only vie@morpheus.systems can run this fix.</p>
+    </div>
+    
+    <button id="runFix" onclick="runFix()">🔧 Run Migration Fix</button>
+    
+    <div class="spinner" id="spinner"></div>
+    
+    <div class="section" id="resultsSection" style="display: none;">
+        <h2>Results</h2>
+        <div id="summary" class="summary" style="display: none;"></div>
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        if (!token) {
+            document.getElementById('results').innerHTML = '<span class="error">Not logged in! Redirecting to login...</span>';
+            setTimeout(() => window.location.href = '/login.html', 2000);
+        }
+        
+        async function runFix() {
+            const button = document.getElementById('runFix');
+            const spinner = document.getElementById('spinner');
+            const resultsSection = document.getElementById('resultsSection');
+            const results = document.getElementById('results');
+            const summary = document.getElementById('summary');
+            
+            button.disabled = true;
+            spinner.classList.add('active');
+            resultsSection.style.display = 'block';
+            results.innerHTML = '<span class="info">Starting migration fix...</span>\n\n';
+            summary.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/fix-migration', {
+                    method: 'POST',
+                    headers: { 'X-Session-Token': token }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    results.innerHTML = `<span class="error">Error: ${data.error || 'Fix failed'}</span>`;
+                    if (data.details) {
+                        results.innerHTML += `\n\nDetails: ${data.details}`;
+                    }
+                    return;
+                }
+                
+                // Show summary
+                if (data.results) {
+                    const r = data.results;
+                    summary.style.display = 'block';
+                    summary.innerHTML = `
+                        <h3>✅ Fix Complete!</h3>
+                        <div class="stat">
+                            <span class="stat-label">Bins Checked:</span>
+                            <span class="stat-value">${r.stats.binsChecked}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Bins Fixed:</span>
+                            <span class="stat-value success">${r.stats.binsFixed}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Conversations Found:</span>
+                            <span class="stat-value">${r.stats.conversationsFound}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Conversations Re-linked:</span>
+                            <span class="stat-value success">${r.stats.conversationsMigrated}</span>
+                        </div>
+                    `;
+                    
+                    // Show detailed results
+                    results.innerHTML = '<span class="success">Fix completed successfully!</span>\n\n';
+                    
+                    if (r.fixed && r.fixed.length > 0) {
+                        results.innerHTML += '<span class="info">Fixes Applied:</span>\n';
+                        r.fixed.forEach(fix => {
+                            results.innerHTML += `  ✓ ${fix}\n`;
+                        });
+                        results.innerHTML += '\n';
+                    }
+                    
+                    if (r.conversationFixes && r.conversationFixes.length > 0) {
+                        results.innerHTML += '<span class="info">Conversations Re-linked:</span>\n';
+                        r.conversationFixes.forEach(fix => {
+                            results.innerHTML += `  ✓ "${fix.conversation}" → ${fix.binName}\n`;
+                        });
+                        results.innerHTML += '\n';
+                    }
+                    
+                    if (r.orphanedConversations && r.orphanedConversations.length > 0) {
+                        results.innerHTML += '<span class="warning">Still Orphaned Conversations:</span>\n';
+                        r.orphanedConversations.forEach(orphan => {
+                            results.innerHTML += `  - ${orphan.name} (binId: ${orphan.binId})\n`;
+                        });
+                        results.innerHTML += '\n';
+                    }
+                    
+                    if (r.foundBins && r.foundBins.length > 0) {
+                        results.innerHTML += '<span class="info">All Bins Found:</span>\n';
+                        r.foundBins.forEach(item => {
+                            results.innerHTML += `  - ${item.bin.name} (${item.key})\n`;
+                        });
+                        results.innerHTML += '\n';
+                    }
+                    
+                    results.innerHTML += '\n<span class="info">Full response:</span>\n';
+                    results.innerHTML += JSON.stringify(data, null, 2);
+                    
+                    results.innerHTML += '\n\n<span class="success">✅ You can now return to the main app and your bins should be working!</span>';
+                } else {
+                    results.innerHTML = JSON.stringify(data, null, 2);
+                }
+                
+            } catch (error) {
+                results.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            } finally {
+                button.disabled = false;
+                spinner.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

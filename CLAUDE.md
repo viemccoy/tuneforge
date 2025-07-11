@@ -294,13 +294,44 @@ sanitizeInput(input) {
   - No interference with bin display
   - Data is always consistent with server state
 
+### 14. Migration Fix Tool
+- **Problem**: After initial migration, only 1 of 4 bins appeared with 0 conversations showing
+- **Root Cause**: 
+  - Ethereality Prompt bin had undefined ID ("bin:morpheus-systems:undefined")
+  - Conversations couldn't be found due to binId mismatch
+  - Some bins might not have been migrated to team structure
+- **Solution**: Created comprehensive fix-migration endpoint and UI
+  - `/api/fix-migration` - Fixes bins with undefined IDs and re-links orphaned conversations
+  - `/fix-migration.html` - User-friendly UI to run the fix (vie@morpheus.systems only)
+  - `/debug-bins.html` - Diagnostic tool to inspect KV store state
+- **Features**:
+  - Generates new UUIDs for bins with undefined IDs
+  - Re-links orphaned conversations to their correct bins
+  - Searches for and fixes missing team assignments
+  - Provides detailed fix report
+- **Results**: All 4 bins now accessible with proper conversation counts
+
 ## Migration Process
 
+### Initial Migration
 To assign existing bins to the morpheus-systems team:
 
 1. **Login as vie@morpheus.systems**
 2. **Visit `/migrate.html`**
 3. **Click "RUN MIGRATION" button**
+
+### Fix Migration Issues
+If bins have undefined IDs or conversations are missing:
+
+1. **Login as vie@morpheus.systems**
+2. **Visit `/fix-migration.html`**
+3. **Click "🔧 Run Migration Fix" button**
+
+### Debug Tools
+To diagnose bin and conversation issues:
+
+1. **Visit `/debug-bins.html`** (vie@morpheus.systems only)
+2. **Use the diagnostic buttons to inspect KV state**
 
 Or run manually via console:
 ```javascript
@@ -336,6 +367,8 @@ fetch('/api/migrate-fixed', {
 - [x] Message recovery system
 - [x] Bin selection and display (fixed with removal of local recovery)
 - [x] Conversation persistence after message weaving (saves immediately to server)
+- [x] Migration fix tool resolves undefined bin IDs
+- [x] All 4 bins accessible after fix-migration
 
 ## Notes
 
