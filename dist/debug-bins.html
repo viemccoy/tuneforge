@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Bin Debug</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        pre {
+            background: #001100;
+            padding: 10px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #00ff00;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #003300;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 TuneForge Bin & Conversation Debug</h1>
+    
+    <div class="section">
+        <h2>Session Info</h2>
+        <pre id="sessionInfo">Loading...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>Actions</h2>
+        <button onclick="listAllBins()">List ALL Bins (Raw KV)</button>
+        <button onclick="listUserBins()">List User's Bins (via API)</button>
+        <button onclick="checkConversations()">Check Conversations</button>
+        <button onclick="runFullDiagnostic()">Run Full Diagnostic</button>
+    </div>
+    
+    <div class="section">
+        <h2>Raw KV Bins</h2>
+        <pre id="rawBins">Click "List ALL Bins" to load...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>User's Bins (API)</h2>
+        <pre id="apiBins">Click "List User's Bins" to load...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>Conversations</h2>
+        <div id="conversations"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Diagnostic Results</h2>
+        <pre id="diagnostic">Click "Run Full Diagnostic" to start...</pre>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        // Show session info
+        async function showSessionInfo() {
+            const el = document.getElementById('sessionInfo');
+            try {
+                const response = await fetch('/api/session-test', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const data = await response.json();
+                el.innerHTML = `Token: ${token ? token.substring(0, 16) + '...' : 'NONE'}\n`;
+                el.innerHTML += `User: ${data.user?.email || 'NONE'}\n`;
+                el.innerHTML += `Team: ${data.user?.teamId || 'NONE'}\n`;
+                el.innerHTML += JSON.stringify(data, null, 2);
+            } catch (error) {
+                el.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        // List all bins from raw KV
+        async function listAllBins() {
+            const el = document.getElementById('rawBins');
+            el.innerHTML = '<span class="warning">Loading all bins from KV...</span>';
+            
+            try {
+                // This endpoint needs to be created
+                const response = await fetch('/api/debug-bins', {
+                    headers: { 'X-Session-Token': token }
+                });
+                
+                if (!response.ok) {
+                    // Fallback to bins-fixed
+                    el.innerHTML = '<span class="warning">Debug endpoint not available, using bins-fixed...</span>\n';
+                    const binsResponse = await fetch('/api/bins-fixed', {
+                        headers: { 'X-Session-Token': token }
+                    });
+                    const data = await binsResponse.json();
+                    el.innerHTML = JSON.stringify(data, null, 2);
+                } else {
+                    const data = await response.json();
+                    el.innerHTML = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                el.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        // List user's bins via API
+        async function listUserBins() {
+            const el = document.getElementById('apiBins');
+            el.innerHTML = '<span class="warning">Loading user bins...</span>';
+            
+            try {
+                const response = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const data = await response.json();
+                
+                if (data.bins) {
+                    el.innerHTML = `Found ${data.bins.length} bins:\n\n`;
+                    data.bins.forEach((bin, i) => {
+                        el.innerHTML += `${i + 1}. ${bin.name} (${bin.id})\n`;
+                        el.innerHTML += `   Team: ${bin.teamId}\n`;
+                        el.innerHTML += `   Conversations: ${bin.conversationCount}\n`;
+                        el.innerHTML += `   Created: ${bin.createdAt}\n\n`;
+                    });
+                    el.innerHTML += '\nFull data:\n' + JSON.stringify(data, null, 2);
+                } else {
+                    el.innerHTML = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                el.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        // Check conversations for each bin
+        async function checkConversations() {
+            const el = document.getElementById('conversations');
+            el.innerHTML = '<p class="warning">Loading conversations...</p>';
+            
+            try {
+                // First get bins
+                const binsResponse = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const binsData = await binsResponse.json();
+                
+                if (!binsData.bins || binsData.bins.length === 0) {
+                    el.innerHTML = '<p class="error">No bins found!</p>';
+                    return;
+                }
+                
+                el.innerHTML = '<h3>Conversations by Bin:</h3>';
+                
+                // Check conversations for each bin
+                for (const bin of binsData.bins) {
+                    el.innerHTML += `<h4>${bin.name} (${bin.id})</h4>`;
+                    
+                    try {
+                        const convResponse = await fetch(`/api/conversations-fixed?binId=${bin.id}`, {
+                            headers: { 'X-Session-Token': token }
+                        });
+                        const convData = await convResponse.json();
+                        
+                        if (convData.conversations && convData.conversations.length > 0) {
+                            el.innerHTML += '<table>';
+                            el.innerHTML += '<tr><th>Name</th><th>ID</th><th>Messages</th><th>Created</th></tr>';
+                            convData.conversations.forEach(conv => {
+                                el.innerHTML += `<tr>`;
+                                el.innerHTML += `<td>${conv.name || 'Untitled'}</td>`;
+                                el.innerHTML += `<td>${conv.id}</td>`;
+                                el.innerHTML += `<td>${conv.messages?.length || 0}</td>`;
+                                el.innerHTML += `<td>${new Date(conv.metadata?.createdAt || conv.createdAt).toLocaleString()}</td>`;
+                                el.innerHTML += `</tr>`;
+                            });
+                            el.innerHTML += '</table>';
+                        } else {
+                            el.innerHTML += `<p class="warning">No conversations found (API returned: ${JSON.stringify(convData)})</p>`;
+                        }
+                    } catch (error) {
+                        el.innerHTML += `<p class="error">Error loading conversations: ${error.message}</p>`;
+                    }
+                }
+            } catch (error) {
+                el.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run full diagnostic
+        async function runFullDiagnostic() {
+            const el = document.getElementById('diagnostic');
+            el.innerHTML = '<span class="warning">Running diagnostic...</span>\n\n';
+            
+            const results = {
+                timestamp: new Date().toISOString(),
+                session: {},
+                bins: {},
+                conversations: {},
+                issues: []
+            };
+            
+            try {
+                // 1. Check session
+                el.innerHTML += '1. Checking session...\n';
+                const sessionResponse = await fetch('/api/session-test', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const sessionData = await sessionResponse.json();
+                results.session = sessionData;
+                el.innerHTML += `   ✓ User: ${sessionData.user?.email || 'NONE'}\n`;
+                el.innerHTML += `   ✓ Team: ${sessionData.user?.teamId || 'NONE'}\n\n`;
+                
+                // 2. Check bins
+                el.innerHTML += '2. Checking bins...\n';
+                const binsResponse = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const binsData = await binsResponse.json();
+                results.bins = binsData;
+                el.innerHTML += `   ✓ Found ${binsData.bins?.length || 0} bins\n\n`;
+                
+                // 3. Check each bin's conversations
+                el.innerHTML += '3. Checking conversations...\n';
+                if (binsData.bins) {
+                    for (const bin of binsData.bins) {
+                        el.innerHTML += `   - ${bin.name}: `;
+                        try {
+                            const convResponse = await fetch(`/api/conversations-fixed?binId=${bin.id}`, {
+                                headers: { 'X-Session-Token': token }
+                            });
+                            const convData = await convResponse.json();
+                            const convCount = convData.conversations?.length || 0;
+                            
+                            el.innerHTML += `${convCount} conversations`;
+                            
+                            // Check for mismatch
+                            if (bin.conversationCount !== convCount) {
+                                el.innerHTML += ` <span class="error">(bin says ${bin.conversationCount}!)</span>`;
+                                results.issues.push(`Bin "${bin.name}" shows ${bin.conversationCount} conversations but API returns ${convCount}`);
+                            }
+                            el.innerHTML += '\n';
+                            
+                            results.conversations[bin.id] = convData;
+                        } catch (error) {
+                            el.innerHTML += `<span class="error">ERROR: ${error.message}</span>\n`;
+                            results.issues.push(`Failed to load conversations for bin "${bin.name}": ${error.message}`);
+                        }
+                    }
+                }
+                
+                // 4. Summary
+                el.innerHTML += '\n4. Summary:\n';
+                el.innerHTML += `   - Session: ${results.session.hasUser ? 'VALID' : 'INVALID'}\n`;
+                el.innerHTML += `   - Bins: ${results.bins.bins?.length || 0}\n`;
+                el.innerHTML += `   - Issues: ${results.issues.length}\n`;
+                
+                if (results.issues.length > 0) {
+                    el.innerHTML += '\n<span class="error">ISSUES FOUND:</span>\n';
+                    results.issues.forEach((issue, i) => {
+                        el.innerHTML += `${i + 1}. ${issue}\n`;
+                    });
+                }
+                
+                el.innerHTML += '\n\nFull diagnostic data:\n';
+                el.innerHTML += JSON.stringify(results, null, 2);
+                
+            } catch (error) {
+                el.innerHTML += `\n<span class="error">Diagnostic failed: ${error.message}</span>`;
+            }
+        }
+        
+        // Initialize
+        showSessionInfo();
+    </script>
+</body>
+</html>
