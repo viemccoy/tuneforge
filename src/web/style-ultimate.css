@@ -520,91 +520,90 @@
 
 /* Settings modal specific styles */
 .settings-modal {
-    min-width: 500px;
+    min-width: 320px;
+    max-width: 400px;
 }
 
-.settings-section {
-    margin-bottom: 1.5rem;
+.confirm-body.compact {
+    padding: 1.5rem;
 }
 
-.settings-section h4 {
-    color: var(--matrix-green);
-    margin: 0 0 1rem 0;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.visibility-options {
+.visibility-toggle {
     display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-}
-
-.radio-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.8rem;
-    padding: 0.8rem;
-    border: 1px solid var(--border-color);
+    gap: 0;
+    border: 1px solid var(--matrix-green-dim);
     border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    overflow: hidden;
+    margin-bottom: 1rem;
 }
 
-.radio-label:hover {
-    border-color: var(--matrix-green-dim);
+.toggle-option {
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.3s ease;
+}
+
+.toggle-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.toggle-label {
+    display: block;
+    padding: 0.8rem 1rem;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--matrix-green-dim);
+    transition: all 0.3s ease;
+}
+
+.toggle-option:first-child {
+    border-right: 1px solid var(--matrix-green-dim);
+}
+
+.toggle-option:hover:not(:has(input:disabled)) .toggle-label {
+    color: var(--matrix-green);
     background: rgba(0, 255, 65, 0.05);
 }
 
-.radio-label input[type="radio"] {
-    margin-top: 0.2rem;
-    accent-color: var(--matrix-green);
+.toggle-option.active {
+    background: var(--matrix-green-dim);
 }
 
-.radio-label input[type="radio"]:disabled {
+.toggle-option.active .toggle-label {
+    color: var(--bg-primary);
+}
+
+.toggle-option:has(input:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.radio-label:has(input:disabled) {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.radio-label:has(input:checked) {
-    border-color: var(--matrix-green);
-    background: rgba(0, 255, 65, 0.1);
-}
-
-.radio-text {
-    color: var(--text-primary);
-    font-weight: 500;
-    display: block;
-}
-
-.radio-desc {
+.settings-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
-    font-size: 0.8rem;
-    display: block;
-    margin-top: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.settings-info {
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-    font-size: 0.85rem;
+.meta-item {
+    opacity: 0.7;
 }
 
-.settings-info p {
-    margin: 0.5rem 0;
-    color: var(--text-secondary);
-}
-
-.settings-info .warning {
+.meta-item.warning {
     color: var(--warning-color);
-    font-style: italic;
+    opacity: 1;
+}
+
+.confirm-actions.compact {
+    padding: 1rem 1.5rem;
 }
 
 .confirm-button {

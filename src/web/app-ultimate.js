@@ -3003,38 +3003,34 @@ class TuneForgeUltimate {
             modal.innerHTML = `
                 <div class="confirm-modal settings-modal">
                     <div class="confirm-header">
-                        <h3>Bin Settings: ${this.escapeHtml(bin.name)}</h3>
+                        <h3>${this.escapeHtml(bin.name)}</h3>
                         <div class="confirm-glow"></div>
                     </div>
-                    <div class="confirm-body">
-                        <div class="settings-section">
-                            <h4>Visibility</h4>
-                            <div class="visibility-options">
-                                <label class="radio-label">
-                                    <input type="radio" name="visibility" value="personal" 
-                                           ${settings.visibility === 'personal' ? 'checked' : ''}
-                                           ${!settings.canEdit ? 'disabled' : ''}>
-                                    <span class="radio-text">Personal</span>
-                                    <span class="radio-desc">Only visible to you</span>
-                                </label>
-                                <label class="radio-label">
-                                    <input type="radio" name="visibility" value="team" 
-                                           ${settings.visibility === 'team' ? 'checked' : ''}
-                                           ${!settings.canEdit ? 'disabled' : ''}>
-                                    <span class="radio-text">Team</span>
-                                    <span class="radio-desc">Visible to all team members</span>
-                                </label>
-                            </div>
+                    <div class="confirm-body compact">
+                        <div class="visibility-toggle">
+                            <label class="toggle-option ${settings.visibility === 'personal' ? 'active' : ''}" 
+                                   data-value="personal">
+                                <input type="radio" name="visibility" value="personal" 
+                                       ${settings.visibility === 'personal' ? 'checked' : ''}
+                                       ${!settings.canEdit ? 'disabled' : ''}>
+                                <span class="toggle-label">PERSONAL</span>
+                            </label>
+                            <label class="toggle-option ${settings.visibility === 'team' ? 'active' : ''}" 
+                                   data-value="team">
+                                <input type="radio" name="visibility" value="team" 
+                                       ${settings.visibility === 'team' ? 'checked' : ''}
+                                       ${!settings.canEdit ? 'disabled' : ''}>
+                                <span class="toggle-label">TEAM</span>
+                            </label>
                         </div>
-                        <div class="settings-info">
-                            <p>Created by: ${this.escapeHtml(settings.createdBy)}</p>
-                            <p>Team: ${this.escapeHtml(settings.teamId)}</p>
-                            ${!settings.canEdit ? '<p class="warning">You can only edit bins you created.</p>' : ''}
+                        <div class="settings-meta">
+                            <span class="meta-item">@${settings.createdBy.split('@')[0]}</span>
+                            ${!settings.canEdit ? '<span class="meta-item warning">READ-ONLY</span>' : ''}
                         </div>
                     </div>
-                    <div class="confirm-actions">
+                    <div class="confirm-actions compact">
                         <button id="settingsSave" class="confirm-button confirm" ${!settings.canEdit ? 'disabled' : ''}>SAVE</button>
-                        <button id="settingsCancel" class="confirm-button cancel">CANCEL</button>
+                        <button id="settingsCancel" class="confirm-button cancel">CLOSE</button>
                     </div>
                 </div>
             `;
@@ -3045,6 +3041,22 @@ class TuneForgeUltimate {
                 modal.classList.remove('active');
                 setTimeout(() => modal.remove(), 300);
             };
+            
+            // Handle toggle clicks
+            const toggleOptions = modal.querySelectorAll('.toggle-option');
+            toggleOptions.forEach(option => {
+                option.addEventListener('click', (e) => {
+                    if (settings.canEdit && !e.target.disabled) {
+                        // Remove active from all
+                        toggleOptions.forEach(opt => opt.classList.remove('active'));
+                        // Add active to clicked
+                        option.classList.add('active');
+                        // Check the radio
+                        const radio = option.querySelector('input[type="radio"]');
+                        if (radio) radio.checked = true;
+                    }
+                });
+            });
             
             // Handle save
             document.getElementById('settingsSave').addEventListener('click', async () => {
@@ -3067,11 +3079,11 @@ class TuneForgeUltimate {
                     // Reload bins to reflect visibility changes
                     await this.loadBins();
                     
-                    this.showSystemMessage('Bin settings updated successfully', 'success');
+                    this.showMessage('Bin settings updated successfully', 'success');
                     cleanup();
                 } catch (error) {
                     console.error('Error updating bin settings:', error);
-                    this.showSystemMessage('Failed to update settings: ' + error.message, 'error');
+                    this.showMessage('Failed to update settings: ' + error.message, 'error');
                 }
             });
             
@@ -3083,7 +3095,7 @@ class TuneForgeUltimate {
             
         } catch (error) {
             console.error('Error showing bin settings:', error);
-            this.showSystemMessage('Failed to load bin settings: ' + error.message, 'error');
+            this.showMessage('Failed to load bin settings: ' + error.message, 'error');
         }
     }
     
