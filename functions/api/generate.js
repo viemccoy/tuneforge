@@ -11,7 +11,7 @@ export async function onRequestPost(context) {
   const timestamp = new Date().toISOString();
   
   try {
-    const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens } = await request.json();
+    const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens, n } = await request.json();
     
     console.log(`[${timestamp}] Request ${requestId}:`, {
       binId,
@@ -56,7 +56,8 @@ export async function onRequestPost(context) {
             messages: [
               { role: 'system', content: systemPrompt },
               ...messages
-            ]
+            ],
+            n: n || 1
           };
           
           // Use appropriate parameters based on model type
@@ -69,6 +70,18 @@ export async function onRequestPost(context) {
           }
           
           const completion = await openai.chat.completions.create(params);
+          
+          // If multiple completions requested, return all
+          if (n > 1) {
+            return {
+              model: modelId,
+              choices: completion.choices.map(choice => ({
+                content: choice.message.content,
+                index: choice.index
+              })),
+              usage: completion.usage
+            };
+          }
           
           return {
             model: modelId,

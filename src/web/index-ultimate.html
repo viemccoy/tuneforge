@@ -148,11 +148,22 @@
                             <button type="button" class="token-btn token-increase" data-action="increase">[+]</button>
                         </div>
                     </div>
+                    <div class="config-group">
+                        <label for="completions">Completions</label>
+                        <div class="token-counter">
+                            <button type="button" class="completion-btn completion-decrease" data-action="decrease">[-]</button>
+                            <div class="token-display">
+                                <span id="completionsValue">1</span>
+                            </div>
+                            <button type="button" class="completion-btn completion-increase" data-action="increase">[+]</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="control-section">
                     <h3>Actions</h3>
                     <div class="action-buttons">
+                        <button id="undoLast" class="btn-secondary">UNDO</button>
                         <button id="regenerateLast" class="btn-secondary">REGENERATE ALL</button>
                         <button id="viewConversations" class="btn-secondary">VIEW ALL</button>
                     </div>

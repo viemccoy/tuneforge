@@ -638,6 +638,78 @@
     cursor: not-allowed;
 }
 
+/* UNDO button special styling */
+#undoLast {
+    background: rgba(255, 170, 0, 0.1);
+    border-color: var(--warning-color);
+    color: var(--warning-color);
+}
+
+#undoLast:hover {
+    background: rgba(255, 170, 0, 0.2);
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+    border-color: var(--warning-color);
+    color: var(--warning-color);
+}
+
+/* Token and completion counter styles */
+.token-counter {
+    display: flex;
+    gap: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.token-counter:focus-within {
+    border-color: var(--matrix-green);
+    box-shadow: var(--glow-sm);
+}
+
+.token-btn,
+.completion-btn {
+    background: var(--bg-secondary);
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0.6rem 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+}
+
+.token-btn:hover,
+.completion-btn:hover {
+    background: var(--hover-bg);
+    color: var(--matrix-green);
+    text-shadow: var(--glow-sm);
+}
+
+.token-btn:active,
+.completion-btn:active {
+    background: var(--active-bg);
+    transform: scale(0.95);
+}
+
+.token-display {
+    flex: 1;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-primary);
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--matrix-green);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    min-width: 60px;
+}
+
 .btn-danger {
     background: rgba(255, 68, 68, 0.2);
     border-color: #ff4444;

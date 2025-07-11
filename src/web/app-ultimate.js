@@ -345,7 +345,12 @@ class TuneForgeUltimate {
         document.querySelector('.token-decrease').addEventListener('click', () => this.adjustTokens(-100));
         document.querySelector('.token-increase').addEventListener('click', () => this.adjustTokens(100));
         
-        // Regenerate All
+        // Completion Controls
+        document.querySelector('.completion-decrease').addEventListener('click', () => this.adjustCompletions(-1));
+        document.querySelector('.completion-increase').addEventListener('click', () => this.adjustCompletions(1));
+        
+        // Actions
+        document.getElementById('undoLast').addEventListener('click', () => this.undoLastMessage());
         document.getElementById('regenerateLast').addEventListener('click', () => this.regenerateAll());
         
         // Export Actions
@@ -1431,6 +1436,7 @@ class TuneForgeUltimate {
         // Get parameters
         const temperature = parseFloat(document.getElementById('temperature').value);
         const maxTokens = parseInt(document.getElementById('maxTokensValue').textContent);
+        const completions = parseInt(document.getElementById('completionsValue').textContent);
         
         // Show loading state
         this.showLoomLoading();
@@ -1440,7 +1446,8 @@ class TuneForgeUltimate {
             binId: this.currentBin.id,
             systemPrompt: document.getElementById('systemPrompt').value,
             messages: this.currentMessages,
-            models: this.selectedModels
+            models: this.selectedModels,
+            n: completions
         };
         
         // Check if any selected model is o3/o4-mini which requires special parameters
@@ -1603,6 +1610,24 @@ class TuneForgeUltimate {
             return;
         }
         
+        // Process responses - flatten if multiple completions from same model
+        const processedResponses = [];
+        data.responses.forEach(resp => {
+            if (resp.choices && Array.isArray(resp.choices)) {
+                // Multiple completions from one model
+                resp.choices.forEach((choice, idx) => {
+                    processedResponses.push({
+                        model: `${resp.model} (${idx + 1}/${resp.choices.length})`,
+                        content: choice.content,
+                        usage: resp.usage // Share usage across all choices
+                    });
+                });
+            } else {
+                // Single completion
+                processedResponses.push(resp);
+            }
+        });
+        
         // Clear pending message backup on successful response
         sessionStorage.removeItem('tuneforge_pending_message');
         
@@ -1615,17 +1640,17 @@ class TuneForgeUltimate {
                     <div class="completion-title">ASSISTANT RESPONSES</div>
                     <div class="completion-nav">
                         <span class="completion-counter">
-                            <span id="loomIndex">1</span> / ${data.responses.length}
+                            <span id="loomIndex">1</span> / ${processedResponses.length}
                         </span>
                         <span>← → navigate | Enter select</span>
                     </div>
                 </div>
                 <div class="completion-slider">
                     <div class="completion-track" id="loomTrack">
-                        ${data.responses.map((resp, i) => this.createCompletionCard(resp, i)).join('')}
+                        ${processedResponses.map((resp, i) => this.createCompletionCard(resp, i)).join('')}
                     </div>
                     <div class="nav-indicators">
-                        ${data.responses.map((_, i) => `
+                        ${processedResponses.map((_, i) => `
                             <div class="nav-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></div>
                         `).join('')}
                     </div>
@@ -1639,22 +1664,22 @@ class TuneForgeUltimate {
         // Setup loom navigation
         this.activeLoom = {
             element: loomEl,
-            responses: data.responses,
+            responses: processedResponses,
             currentIndex: 0,
             createdAt: Date.now()
         };
         
         // Log unselected loom for debugging
         console.log('[TuneForge] Loom created with responses:', {
-            responseCount: data.responses.length,
-            models: data.responses.map(r => r.model),
+            responseCount: processedResponses.length,
+            models: processedResponses.map(r => r.model),
             messageCount: this.currentMessages.length,
             timestamp: new Date().toISOString()
         });
         
         // Save pending loom to session storage
         const pendingLoom = {
-            responses: data.responses,
+            responses: processedResponses,
             messageCountBeforeLoom: this.currentMessages.length,
             createdAt: Date.now()
         };
@@ -2659,6 +2684,105 @@ class TuneForgeUltimate {
         }, 1000);
     }
     
+    async undoLastMessage() {
+        // Check if there's an active loom that needs to be selected first
+        if (this.activeLoom) {
+            this.showNotification('Please select a response first', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Add pulsing animation to draw attention
+                loomElement.classList.add('pulse-warning');
+                setTimeout(() => loomElement.classList.remove('pulse-warning'), 2000);
+            }
+            return;
+        }
+        
+        // Check if we have any messages to undo
+        if (this.currentMessages.length < 2) {
+            this.showNotification('No messages to undo', 'warning');
+            return;
+        }
+        
+        // Find the last user message index
+        let lastUserIndex = -1;
+        let lastAssistantIndex = -1;
+        
+        for (let i = this.currentMessages.length - 1; i >= 0; i--) {
+            if (this.currentMessages[i].role === 'assistant' && lastAssistantIndex === -1) {
+                lastAssistantIndex = i;
+            } else if (this.currentMessages[i].role === 'user' && lastUserIndex === -1) {
+                lastUserIndex = i;
+            }
+            
+            if (lastUserIndex !== -1 && lastAssistantIndex !== -1) break;
+        }
+        
+        // If we don't have a complete pair, handle edge cases
+        if (lastAssistantIndex === -1) {
+            // No assistant message, just remove the last user message
+            if (lastUserIndex !== -1) {
+                const userMessage = this.currentMessages[lastUserIndex];
+                this.currentMessages.splice(lastUserIndex, 1);
+                
+                // Put the message back in the input box
+                document.getElementById('userMessage').value = userMessage.content;
+                
+                // Remove from UI
+                const flow = document.getElementById('conversationFlow');
+                const messageBlocks = flow.querySelectorAll('.message-block');
+                if (messageBlocks.length > 0) {
+                    messageBlocks[messageBlocks.length - 1].remove();
+                }
+                
+                this.showNotification('Message restored to input box', 'success');
+                
+                // Save the updated conversation
+                if (this.currentConversationId) {
+                    await this.saveConversation(true);
+                }
+                return;
+            }
+        }
+        
+        // Normal case: remove the last user-assistant pair
+        if (lastUserIndex !== -1 && lastAssistantIndex !== -1) {
+            // Get the user message content before removing
+            const userMessage = this.currentMessages[lastUserIndex];
+            
+            // Remove both messages from the array
+            this.currentMessages = this.currentMessages.slice(0, lastUserIndex);
+            
+            // Put the user message back in the input box
+            document.getElementById('userMessage').value = userMessage.content;
+            
+            // Remove from UI - find and remove the last two message blocks
+            const flow = document.getElementById('conversationFlow');
+            const messageBlocks = flow.querySelectorAll('.message-block');
+            
+            // Count how many blocks to remove (user message + assistant response)
+            let blocksToRemove = 0;
+            for (let i = messageBlocks.length - 1; i >= 0 && blocksToRemove < 2; i--) {
+                const block = messageBlocks[i];
+                if (block.querySelector('.message.user') || block.querySelector('.message.assistant')) {
+                    block.remove();
+                    blocksToRemove++;
+                }
+            }
+            
+            this.showNotification('Last exchange undone - message restored to input box', 'success');
+            
+            // Focus the input box
+            document.getElementById('userMessage').focus();
+            
+            // Save the updated conversation
+            if (this.currentConversationId) {
+                await this.saveConversation(true);
+            }
+        }
+    }
+    
     // Export & Stats
     async exportDataset(format) {
         const conversations = this.conversations;
@@ -2867,6 +2991,12 @@ class TuneForgeUltimate {
         const current = parseInt(document.getElementById('maxTokensValue').textContent);
         const newValue = Math.max(100, Math.min(4000, current + delta));
         document.getElementById('maxTokensValue').textContent = newValue;
+    }
+    
+    adjustCompletions(delta) {
+        const current = parseInt(document.getElementById('completionsValue').textContent);
+        const newValue = Math.max(1, Math.min(10, current + delta));
+        document.getElementById('completionsValue').textContent = newValue;
     }
     
     showNotification(message, type = 'success') {
