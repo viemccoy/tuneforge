@@ -44,8 +44,12 @@ export async function onRequestPost(context) {
       baseURL: 'https://openrouter.ai/api/v1'
     }) : null;
     
-    // Generate responses in parallel
-    const responsePromises = models.map(async (modelId) => {
+    // Generate responses in parallel - create N completions for each model
+    const responsePromises = models.flatMap(modelId => 
+      Array.from({ length: n || 1 }, (_, i) => generateSingleResponse(modelId, i))
+    );
+    
+    async function generateSingleResponse(modelId, completionIndex) {
       try {
         // Handle OpenAI models (including o3/o4-mini)
         if ((modelId.startsWith('gpt') || modelId.startsWith('o3') || modelId.startsWith('o4')) && openai) {
@@ -57,7 +61,7 @@ export async function onRequestPost(context) {
               { role: 'system', content: systemPrompt },
               ...messages
             ],
-            n: n || 1
+            n: 1 // Always generate 1 at a time since we're calling multiple times
           };
           
           // Use appropriate parameters based on model type
@@ -71,22 +75,12 @@ export async function onRequestPost(context) {
           
           const completion = await openai.chat.completions.create(params);
           
-          // If multiple completions requested, return all
-          if (n > 1) {
-            return {
-              model: modelId,
-              choices: completion.choices.map(choice => ({
-                content: choice.message.content,
-                index: choice.index
-              })),
-              usage: completion.usage
-            };
-          }
-          
           return {
             model: modelId,
             content: completion.choices[0].message.content,
-            usage: completion.usage
+            usage: completion.usage,
+            completionIndex: completionIndex + 1,
+            totalCompletions: n || 1
           };
         } else if (modelId.startsWith('claude') && anthropic) {
           const completion = await anthropic.messages.create({
@@ -107,7 +101,9 @@ export async function onRequestPost(context) {
               prompt_tokens: completion.usage.input_tokens,
               completion_tokens: completion.usage.output_tokens,
               total_tokens: completion.usage.input_tokens + completion.usage.output_tokens
-            }
+            },
+            completionIndex: completionIndex + 1,
+            totalCompletions: n || 1
           };
         } else if ((modelId.startsWith('deepseek') || modelId.startsWith('x-ai/grok')) && openrouter) {
           // Handle Deepseek and Grok models through OpenRouter
@@ -124,7 +120,9 @@ export async function onRequestPost(context) {
           return {
             model: modelId,
             content: completion.choices[0].message.content,
-            usage: completion.usage
+            usage: completion.usage,
+            completionIndex: completionIndex + 1,
+            totalCompletions: n || 1
           };
         } else if ((modelId.includes('gemini') || modelId.startsWith('models/gemini')) && google) {
           // Handle Google Gemini models
@@ -165,7 +163,9 @@ export async function onRequestPost(context) {
             usage: {
               // Gemini doesn't provide token counts in the same way
               total_tokens: Math.ceil((currentPrompt.length + response.text().length) / 4)
-            }
+            },
+            completionIndex: completionIndex + 1,
+            totalCompletions: n || 1
           };
         } else {
           return {
@@ -177,10 +177,12 @@ export async function onRequestPost(context) {
         console.error(`Error with ${modelId}:`, error);
         return {
           model: modelId,
-          error: error.message
+          error: error.message,
+          completionIndex: completionIndex + 1,
+          totalCompletions: n || 1
         };
       }
-    });
+    }
     
     const responses = await Promise.all(responsePromises);
     

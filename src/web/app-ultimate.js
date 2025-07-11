@@ -1610,22 +1610,15 @@ class TuneForgeUltimate {
             return;
         }
         
-        // Process responses - flatten if multiple completions from same model
-        const processedResponses = [];
-        data.responses.forEach(resp => {
-            if (resp.choices && Array.isArray(resp.choices)) {
-                // Multiple completions from one model
-                resp.choices.forEach((choice, idx) => {
-                    processedResponses.push({
-                        model: `${resp.model} (${idx + 1}/${resp.choices.length})`,
-                        content: choice.content,
-                        usage: resp.usage // Share usage across all choices
-                    });
-                });
-            } else {
-                // Single completion
-                processedResponses.push(resp);
+        // Process responses - update model name to show completion index if multiple
+        const processedResponses = data.responses.map(resp => {
+            if (resp.totalCompletions > 1) {
+                return {
+                    ...resp,
+                    model: `${resp.model} (${resp.completionIndex}/${resp.totalCompletions})`
+                };
             }
+            return resp;
         });
         
         // Clear pending message backup on successful response

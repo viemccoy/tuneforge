@@ -638,18 +638,12 @@
     cursor: not-allowed;
 }
 
-/* UNDO button special styling */
-#undoLast {
+/* UNDO button special styling - only on hover */
+#undoLast:hover {
     background: rgba(255, 170, 0, 0.1);
     border-color: var(--warning-color);
     color: var(--warning-color);
-}
-
-#undoLast:hover {
-    background: rgba(255, 170, 0, 0.2);
-    box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
-    border-color: var(--warning-color);
-    color: var(--warning-color);
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
 }
 
 /* Token and completion counter styles */
