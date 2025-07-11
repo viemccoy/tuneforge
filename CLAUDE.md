@@ -6,6 +6,30 @@ This document tracks all enhancements and improvements made to TuneForge during 
 
 TuneForge is a sophisticated dataset builder for AI fine-tuning with a cyberpunk Matrix-inspired UI. It features bin-based organization, multi-model support, conversation branching, and real-time presence tracking.
 
+## Current Architecture (As of July 2025)
+
+### Deployment
+- **Platform**: Cloudflare Pages with Functions
+- **Authentication**: Session-based with sessionStorage (client) and KV storage (server)
+- **Data Storage**: Cloudflare KV namespaces (BINS, CONVERSATIONS, USERS, SESSIONS, TEAMS, PRESENCE)
+- **Build Process**: `build-cloudflare.js` copies from `src/web/` to `dist/`
+
+### Key Files
+- **Frontend**: 
+  - `src/web/app-ultimate.js` → `dist/app.js` (main application)
+  - `src/web/index-ultimate.html` → `dist/index.html` (main UI)
+  - `src/web/login.js` → `dist/login.js` (login page)
+- **Backend**: 
+  - `/functions/api/*` - API endpoints with inline authentication
+  - `/functions/_middleware.js` - Disabled HTML auth check (app handles auth)
+
+### Available Models
+- GPT-4.1, GPT-o3, GPT-o4-mini (OpenAI)
+- Claude Opus 4, Claude Sonnet 4 (Anthropic)
+- Gemini 2.5 Pro (Google)
+- Grok 3, Grok 3 Mini, Grok 4 (X.AI via OpenRouter)
+- Deepseek R1 (OpenRouter)
+
 ## Major Features Implemented
 
 ### 1. Conversation Name Persistence
@@ -221,19 +245,23 @@ sanitizeInput(input) {
 ### 10. User-Based Authentication System
 - **Problem**: Original system was password-only, needed user accounts for data protection
 - **Challenges**: 
-  - Cloudflare Pages middleware wasn't being executed
+  - Cloudflare Pages middleware wasn't being executed properly
   - Session cookies weren't being set properly due to Cloudflare limitations
-  - Multiple authentication patterns tried: _middleware.js, [[path]].js, api/_middleware.js
+  - Syntax errors in app.js prevented initialization
+  - Build process was overwriting fixes in dist/ with old files from src/
 - **Solution**:
-  - Created auth wrapper utility (`/functions/auth-wrapper.js`) for inline authentication
+  - Created auth wrapper utility for inline authentication
   - Built dedicated endpoints with built-in auth (`bins-fixed.js`, `migrate-fixed.js`, `conversations-fixed.js`, `presence-fixed.js`)
   - Store session tokens in sessionStorage and send via X-Session-Token header
   - User accounts stored in KV with email as key: `user:email@example.com`
   - Sessions stored in KV: `session:token` with user reference
+  - Disabled server-side HTML auth check in middleware (app handles auth client-side)
+  - Fixed all syntax errors in source files (removed unreachable code, extra braces)
 - **Benefits**:
   - Team-based bin organization prevents data loss
   - Proper user attribution and access control
   - Migration tool to assign existing bins to teams
+  - User info displayed in header showing email and team
 
 ### 11. Fixed Endpoint Implementation
 - **Problem**: Conversations and presence endpoints were failing with 500 errors due to missing user context
@@ -268,8 +296,13 @@ sanitizeInput(input) {
 
 ## Migration Process
 
-To assign existing bins to the morpheus-systems team after deployment:
+To assign existing bins to the morpheus-systems team:
 
+1. **Login as vie@morpheus.systems**
+2. **Visit `/migrate.html`**
+3. **Click "RUN MIGRATION" button**
+
+Or run manually via console:
 ```javascript
 // Run in browser console after logging in as vie@morpheus.systems
 const token = sessionStorage.getItem('tuneforge_session');

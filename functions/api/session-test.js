@@ -53,8 +53,8 @@ export async function onRequestGet(context) {
   
   return new Response(JSON.stringify({
     hasContext: !!context,
-    hasUser: !!context.data?.user,
-    user: context.data?.user?.email || null,
+    hasUser: !!userData,
+    user: userData,
     cookieToken,
     headerToken,
     tokenUsed: token,
