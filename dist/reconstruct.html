@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Bin Reconstruction</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            display: block;
+            margin: 20px auto;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px #00ff00;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #001100;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #00ff00;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #003300;
+            font-weight: bold;
+        }
+        .pattern-analysis {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.02);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        .pattern-analysis h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+        ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+        ul li:before {
+            content: "▸ ";
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔨 TuneForge Bin Reconstruction</h1>
+    
+    <div class="section">
+        <h2>What This Does</h2>
+        <p>Based on your deep scan, I found that all conversations have <code>binId: undefined</code>, but their keys contain the original bin IDs as prefixes.</p>
+        
+        <div class="pattern-analysis">
+            <h3>Detected Patterns:</h3>
+            <table>
+                <tr>
+                    <th>Pattern (Bin ID)</th>
+                    <th>Conversations</th>
+                    <th>Likely Bin Name</th>
+                </tr>
+                <tr>
+                    <td><code>e452d57a2f042242</code></td>
+                    <td>3 conversations</td>
+                    <td class="success">Ethereality Prompt</td>
+                </tr>
+                <tr>
+                    <td><code>8285f8917a8df68a</code></td>
+                    <td>4 conversations</td>
+                    <td class="success">Morpheus Superprompt 2</td>
+                </tr>
+                <tr>
+                    <td><code>bd71ea223c11ca7d</code></td>
+                    <td>2 conversations</td>
+                    <td class="warning">jess test bin (or Michael's)</td>
+                </tr>
+                <tr>
+                    <td><code>0f1b31446f3c5447</code></td>
+                    <td>1 conversation</td>
+                    <td class="warning">Michael's Original Prompt (or jess)</td>
+                </tr>
+            </table>
+        </div>
+        
+        <p>This tool will:</p>
+        <ul>
+            <li>Create the missing bins (Morpheus Superprompt 2, jess test bin, Michael's Original Prompt)</li>
+            <li>Link all orphaned conversations to their correct bins based on the key patterns</li>
+            <li>Update conversation counts for all bins</li>
+            <li>Fix the Ethereality Prompt conversations</li>
+        </ul>
+    </div>
+    
+    <button id="reconstructBtn" onclick="reconstruct()">🔨 Reconstruct All Bins</button>
+    
+    <div class="section" id="resultsSection" style="display: none;">
+        <h2>Reconstruction Results</h2>
+        <div id="summary"></div>
+        <h3>Detailed Log:</h3>
+        <div class="results" id="results"></div>
+    </div>
+    
+    <div class="section" style="margin-top: 40px;">
+        <h2>After Reconstruction</h2>
+        <p>Once complete, you should have:</p>
+        <ul>
+            <li>✅ All 4 bins restored (Ethereality Prompt, Morpheus Superprompt 2, jess test bin, Michael's Original Prompt)</li>
+            <li>✅ All 12 conversations properly linked to their bins</li>
+            <li>✅ Correct conversation counts on each bin</li>
+        </ul>
+        <button onclick="window.location.href = '/'">🏠 Return to App</button>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        if (!token) {
+            alert('Not logged in! Redirecting to login...');
+            window.location.href = '/login.html';
+        }
+        
+        async function reconstruct() {
+            const btn = document.getElementById('reconstructBtn');
+            const resultsSection = document.getElementById('resultsSection');
+            const summaryEl = document.getElementById('summary');
+            const resultsEl = document.getElementById('results');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Reconstructing...';
+            resultsSection.style.display = 'block';
+            resultsEl.innerHTML = '<span class="warning">Starting reconstruction...</span>\n\n';
+            
+            try {
+                const response = await fetch('/api/reconstruct-bins', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    resultsEl.innerHTML = `<span class="error">Error: ${data.error}</span>`;
+                    if (data.details) {
+                        resultsEl.innerHTML += `\n\nDetails: ${data.details}`;
+                    }
+                    return;
+                }
+                
+                // Display summary
+                summaryEl.innerHTML = `
+                    <div class="success" style="font-size: 18px; padding: 10px; text-align: center;">
+                        ✅ ${data.message}
+                    </div>
+                `;
+                
+                // Display detailed results
+                resultsEl.innerHTML = '<span class="success">Reconstruction completed!</span>\n\n';
+                
+                if (data.results.created.length > 0) {
+                    resultsEl.innerHTML += '<span class="info">Created Bins:</span>\n';
+                    data.results.created.forEach(bin => {
+                        resultsEl.innerHTML += `  ✅ ${bin.name} (${bin.conversationCount} conversations)\n`;
+                    });
+                    resultsEl.innerHTML += '\n';
+                }
+                
+                if (data.results.updated.length > 0) {
+                    resultsEl.innerHTML += '<span class="info">Updated Bins:</span>\n';
+                    data.results.updated.forEach(bin => {
+                        resultsEl.innerHTML += `  📊 ${bin.bin} - ${bin.conversationCount} conversations\n`;
+                    });
+                    resultsEl.innerHTML += '\n';
+                }
+                
+                if (data.results.linked.length > 0) {
+                    resultsEl.innerHTML += '<span class="info">Linked Conversations:</span>\n';
+                    const byBin = {};
+                    data.results.linked.forEach(link => {
+                        if (!byBin[link.linkedTo]) byBin[link.linkedTo] = [];
+                        byBin[link.linkedTo].push(link.conversation);
+                    });
+                    
+                    Object.entries(byBin).forEach(([binName, convs]) => {
+                        resultsEl.innerHTML += `  ${binName}:\n`;
+                        convs.forEach(conv => {
+                            resultsEl.innerHTML += `    ✓ ${conv}\n`;
+                        });
+                    });
+                    resultsEl.innerHTML += '\n';
+                }
+                
+                resultsEl.innerHTML += '<span class="success">🎉 All bins and conversations have been reconstructed!</span>\n';
+                resultsEl.innerHTML += '\nYou can now return to the main app to see all your restored data.\n\n';
+                
+                resultsEl.innerHTML += '<span class="info">Full response:</span>\n';
+                resultsEl.innerHTML += JSON.stringify(data, null, 2);
+                
+            } catch (error) {
+                resultsEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔨 Reconstruct All Bins';
+            }
+        }
+    </script>
+</body>
+</html>
