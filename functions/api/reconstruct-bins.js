@@ -6,7 +6,7 @@ export async function onRequestPost(context) {
   let sessionToken = request.headers.get('X-Session-Token');
   if (!sessionToken) {
     const cookie = request.headers.get('Cookie');
-    sessionToken = cookie?.match(/session=([^;]+]/)?.[1];
+    sessionToken = cookie?.match(/session=([^;]+)/)?.[1];
   }
   
   if (!sessionToken) {
