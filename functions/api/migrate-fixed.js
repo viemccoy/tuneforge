@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
       migrationResults.push('Created morpheus-systems team');
     }
     
-    // Ensure vie@morpheus.systems exists as admin
+    // Ensure vie@morpheus.systems exists as admin with correct teamId
     const vieEmail = 'vie@morpheus.systems';
     let vieUser = await env.USERS.get(`user:${vieEmail}`, 'json');
     
@@ -76,6 +76,12 @@ export async function onRequestPost(context) {
       };
       await env.USERS.put(`user:${vieEmail}`, JSON.stringify(vieUser));
       migrationResults.push('Created vie@morpheus.systems user');
+    } else if (vieUser.teamId !== teamId) {
+      // Update existing user's teamId if it doesn't match
+      const oldTeamId = vieUser.teamId;
+      vieUser.teamId = teamId;
+      await env.USERS.put(`user:${vieEmail}`, JSON.stringify(vieUser));
+      migrationResults.push(`Updated vie@morpheus.systems teamId from '${oldTeamId}' to '${teamId}'`);
     }
     
     // Process each bin

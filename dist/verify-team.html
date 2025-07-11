@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Team Setup</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        pre {
+            background: #001100;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            overflow-x: auto;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        h2 { margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verify Team Setup</h1>
+    
+    <button onclick="checkSetup()">Check Current Setup</button>
+    <button onclick="runMigration()">Run Migration Again</button>
+    <button onclick="reloadApp()">Reload App</button>
+    
+    <h2>Current Status:</h2>
+    <pre id="status">Click "Check Current Setup" to start...</pre>
+    
+    <h2>Migration Results:</h2>
+    <pre id="migration" style="display: none;"></pre>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        async function checkSetup() {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = '<span class="warning">Checking...</span>\n\n';
+            
+            try {
+                // 1. Check session and user
+                const sessionResp = await fetch('/api/session-test', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const sessionData = await sessionResp.json();
+                
+                statusEl.innerHTML += '<span class="info">USER INFO:</span>\n';
+                statusEl.innerHTML += `Email: ${sessionData.user?.email || 'NONE'}\n`;
+                statusEl.innerHTML += `TeamId: ${sessionData.user?.teamId || 'NONE'}\n`;
+                statusEl.innerHTML += `Role: ${sessionData.user?.role || 'NONE'}\n\n`;
+                
+                // 2. Check bins
+                const binsResp = await fetch('/api/bins-fixed', {
+                    headers: { 'X-Session-Token': token }
+                });
+                const binsData = await binsResp.json();
+                
+                statusEl.innerHTML += '<span class="info">BINS:</span>\n';
+                if (binsData.bins && binsData.bins.length > 0) {
+                    binsData.bins.forEach(bin => {
+                        statusEl.innerHTML += `✓ ${bin.name} (teamId: ${bin.teamId})\n`;
+                    });
+                    statusEl.innerHTML += `\n<span class="success">Total: ${binsData.bins.length} bins found</span>\n`;
+                } else {
+                    statusEl.innerHTML += '<span class="error">No bins found!</span>\n';
+                    statusEl.innerHTML += '\nPossible issues:\n';
+                    statusEl.innerHTML += `- User teamId (${sessionData.user?.teamId}) doesn't match bin teamIds\n`;
+                    statusEl.innerHTML += '- Bins not migrated properly\n';
+                    statusEl.innerHTML += '\nTry clicking "Run Migration Again"\n';
+                }
+                
+                // 3. Check raw bins (debug)
+                const debugResp = await fetch('/api/debug-bins', {
+                    headers: { 'X-Session-Token': token }
+                });
+                if (debugResp.ok) {
+                    const debugData = await debugResp.json();
+                    statusEl.innerHTML += '\n<span class="info">RAW BINS IN KV:</span>\n';
+                    debugData.bins?.forEach(item => {
+                        statusEl.innerHTML += `- ${item.key} → ${item.bin.name} (teamId: ${item.bin.teamId})\n`;
+                    });
+                }
+                
+            } catch (error) {
+                statusEl.innerHTML += `\n<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function runMigration() {
+            const statusEl = document.getElementById('status');
+            const migrationEl = document.getElementById('migration');
+            
+            statusEl.innerHTML += '\n<span class="warning">Running migration...</span>\n';
+            migrationEl.style.display = 'block';
+            migrationEl.innerHTML = '<span class="warning">Migration in progress...</span>';
+            
+            try {
+                const response = await fetch('/api/migrate-fixed', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    migrationEl.innerHTML = '<span class="success">Migration successful!</span>\n\n';
+                    migrationEl.innerHTML += JSON.stringify(data, null, 2);
+                    
+                    // Recheck setup after migration
+                    setTimeout(() => {
+                        statusEl.innerHTML += '\n<span class="info">Rechecking after migration...</span>\n\n';
+                        checkSetup();
+                    }, 1000);
+                } else {
+                    migrationEl.innerHTML = `<span class="error">Migration failed: ${data.error}</span>`;
+                }
+                
+            } catch (error) {
+                migrationEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        function reloadApp() {
+            window.location.href = '/';
+        }
+        
+        // Auto-check on load
+        checkSetup();
+    </script>
+</body>
+</html>
