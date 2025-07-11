@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Deep Scan</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #001100;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #00ff00;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #003300;
+            font-weight: bold;
+        }
+        .missing { color: #ff0000; }
+        .found { color: #00ff00; }
+        .manual-fix {
+            background: #001100;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ffaa00;
+            border-radius: 5px;
+        }
+        .manual-fix code {
+            color: #ffaa00;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 TuneForge Deep Scan</h1>
+    
+    <div class="section">
+        <h2>What This Does</h2>
+        <p>This tool performs a deep scan of your Cloudflare KV store to find:</p>
+        <ul>
+            <li>All bins (regardless of format or team)</li>
+            <li>All conversations and their bin associations</li>
+            <li>Missing bins: Michael's Original Prompt, jess test bin, etc.</li>
+            <li>Orphaned conversations (conversations without valid bins)</li>
+            <li>Manual migration instructions for each issue</li>
+        </ul>
+    </div>
+    
+    <button id="scanBtn" onclick="runDeepScan()">🔍 Run Deep Scan</button>
+    
+    <div id="results" style="display: none;">
+        <div class="section">
+            <h2>Scan Results</h2>
+            <div id="summary"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Found Bins</h2>
+            <div id="bins"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Missing Bins</h2>
+            <div id="missingBins"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Conversations by Bin</h2>
+            <div id="conversations"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Manual Fix Instructions</h2>
+            <div id="manualFixes"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Raw Data</h2>
+            <pre id="rawData"></pre>
+        </div>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        if (!token) {
+            alert('Not logged in! Redirecting to login...');
+            window.location.href = '/login.html';
+        }
+        
+        async function runDeepScan() {
+            const btn = document.getElementById('scanBtn');
+            const resultsEl = document.getElementById('results');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Scanning...';
+            
+            try {
+                const response = await fetch('/api/deep-scan', {
+                    headers: { 'X-Session-Token': token }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(`Error: ${error.error}`);
+                    return;
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+                resultsEl.style.display = 'block';
+                
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Run Deep Scan';
+            }
+        }
+        
+        function displayResults(data) {
+            // Summary
+            const summaryEl = document.getElementById('summary');
+            summaryEl.innerHTML = `
+                <table>
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Total Bins Found</td><td class="${data.stats.totalBins > 0 ? 'success' : 'error'}">${data.stats.totalBins}</td></tr>
+                    <tr><td>Total Conversations</td><td>${data.stats.totalConversations}</td></tr>
+                    <tr><td>Orphaned Conversations</td><td class="${data.stats.orphanedConversations > 0 ? 'warning' : 'success'}">${data.stats.orphanedConversations}</td></tr>
+                    <tr><td>Your Team ID</td><td>${data.user.teamId || 'NONE'}</td></tr>
+                </table>
+            `;
+            
+            // Found Bins
+            const binsEl = document.getElementById('bins');
+            if (data.bins.all.length > 0) {
+                let html = '<table><tr><th>Name</th><th>ID</th><th>Team</th><th>Key Format</th><th>Conversations</th></tr>';
+                data.bins.all.forEach(bin => {
+                    const hasCorrectTeam = bin.teamId === 'morpheus-systems';
+                    html += `<tr>`;
+                    html += `<td>${bin.name}</td>`;
+                    html += `<td>${bin.id}</td>`;
+                    html += `<td class="${hasCorrectTeam ? 'success' : 'warning'}">${bin.teamId || 'NONE'}</td>`;
+                    html += `<td>${bin.key}</td>`;
+                    html += `<td>${bin.conversationCount}</td>`;
+                    html += `</tr>`;
+                });
+                html += '</table>';
+                binsEl.innerHTML = html;
+            } else {
+                binsEl.innerHTML = '<p class="error">No bins found!</p>';
+            }
+            
+            // Missing Bins
+            const missingEl = document.getElementById('missingBins');
+            const expectedBins = ['Michael\'s Original Prompt', 'Morpheus Superprompt 2', 'jess test bin', 'Ethereality Prompt'];
+            let missingHtml = '<ul>';
+            expectedBins.forEach(name => {
+                if (data.bins.byName[name]) {
+                    missingHtml += `<li class="found">✓ ${name} - FOUND</li>`;
+                } else {
+                    missingHtml += `<li class="missing">✗ ${name} - MISSING</li>`;
+                }
+            });
+            missingHtml += '</ul>';
+            missingEl.innerHTML = missingHtml;
+            
+            // Conversations by Bin
+            const convEl = document.getElementById('conversations');
+            let convHtml = '';
+            data.bins.all.forEach(bin => {
+                const convs = data.conversations.byBinId[bin.id] || [];
+                convHtml += `<h3>${bin.name}</h3>`;
+                convHtml += `<p>Expected: ${bin.conversationCount}, Found: ${convs.length}</p>`;
+                if (convs.length > 0) {
+                    convHtml += '<ul>';
+                    convs.slice(0, 5).forEach(conv => {
+                        convHtml += `<li>${conv.name} (${conv.messageCount} messages)</li>`;
+                    });
+                    if (convs.length > 5) {
+                        convHtml += `<li>... and ${convs.length - 5} more</li>`;
+                    }
+                    convHtml += '</ul>';
+                } else if (bin.conversationCount > 0) {
+                    convHtml += '<p class="error">⚠️ No conversations found but bin shows ' + bin.conversationCount + '</p>';
+                }
+            });
+            
+            if (data.conversations.orphaned.length > 0) {
+                convHtml += '<h3 class="error">Orphaned Conversations</h3>';
+                convHtml += '<ul>';
+                data.conversations.orphaned.forEach(conv => {
+                    convHtml += `<li>${conv.name} (binId: ${conv.binId})</li>`;
+                });
+                convHtml += '</ul>';
+            }
+            convEl.innerHTML = convHtml;
+            
+            // Manual Fixes
+            const fixesEl = document.getElementById('manualFixes');
+            let fixesHtml = '';
+            
+            // Generate manual migration commands
+            data.bins.all.forEach(bin => {
+                if (!bin.teamId || bin.teamId !== 'morpheus-systems') {
+                    fixesHtml += `
+                        <div class="manual-fix">
+                            <h4>Fix team for "${bin.name}":</h4>
+                            <code>
+// Run in Cloudflare dashboard or wrangler:<br>
+const bin = await env.BINS.get('${bin.key}', 'json');<br>
+bin.teamId = 'morpheus-systems';<br>
+await env.BINS.put('bin:morpheus-systems:${bin.id}', JSON.stringify(bin));<br>
+await env.BINS.delete('${bin.key}');
+                            </code>
+                        </div>
+                    `;
+                }
+            });
+            
+            // Check for missing conversations
+            data.bins.all.forEach(bin => {
+                const convs = data.conversations.byBinId[bin.id] || [];
+                if (convs.length === 0 && bin.conversationCount > 0) {
+                    fixesHtml += `
+                        <div class="manual-fix">
+                            <h4>Find conversations for "${bin.name}":</h4>
+                            <p>This bin claims ${bin.conversationCount} conversations but none were found.</p>
+                            <code>
+// Search for conversations with wrong binId:<br>
+const list = await env.CONVERSATIONS.list({ limit: 1000 });<br>
+for (const key of list.keys) {<br>
+  const conv = await env.CONVERSATIONS.get(key.name, 'json');<br>
+  if (conv && conv.messages && conv.messages.length > 0) {<br>
+    // Check if this might belong to ${bin.name}<br>
+    console.log(conv.name, conv.binId, conv.messages[0]);<br>
+  }<br>
+}
+                            </code>
+                        </div>
+                    `;
+                }
+            });
+            
+            if (data.suggestions && data.suggestions.length > 0) {
+                fixesHtml += '<h3>Automated Suggestions:</h3><ul>';
+                data.suggestions.forEach(suggestion => {
+                    fixesHtml += `<li>${suggestion.action}</li>`;
+                });
+                fixesHtml += '</ul>';
+            }
+            
+            fixesEl.innerHTML = fixesHtml || '<p class="success">No manual fixes needed!</p>';
+            
+            // Raw data
+            document.getElementById('rawData').textContent = JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>

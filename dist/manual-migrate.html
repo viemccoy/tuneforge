@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TuneForge Manual Migration</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 65, 0.05);
+            border-radius: 5px;
+        }
+        .action-btn {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 5px;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .danger {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .danger:hover {
+            background: #ff0000;
+            color: #000;
+            box-shadow: 0 0 15px #ff0000;
+        }
+        pre {
+            background: #001100;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #001100;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            display: none;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.02);
+            border-left: 3px solid #00ff00;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 TuneForge Manual Migration</h1>
+    
+    <div class="section">
+        <h2>⚠️ Manual Recovery Tools</h2>
+        <p>These tools will help recover your missing bins and conversations. Run them in order:</p>
+    </div>
+    
+    <div class="section">
+        <div class="step">
+            <h3>Step 1: Create Missing Bins</h3>
+            <p>This will create the 3 missing bins: Michael's Original Prompt, Morpheus Superprompt 2, and jess test bin</p>
+            <button class="action-btn" onclick="runAction('CREATE_MISSING_BINS')">
+                📦 Create Missing Bins
+            </button>
+            <div id="results-CREATE_MISSING_BINS" class="results"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 2: Fix Conversation Counts</h3>
+            <p>This will recalculate the actual conversation count for each bin</p>
+            <button class="action-btn" onclick="runAction('FIX_CONVERSATION_COUNT')">
+                🔢 Fix Conversation Counts
+            </button>
+            <div id="results-FIX_CONVERSATION_COUNT" class="results"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 3: Link Orphaned Conversations</h3>
+            <p>This will try to link conversations that lost their bin association</p>
+            <button class="action-btn" onclick="runAction('LINK_ORPHANED_CONVERSATIONS')">
+                🔗 Link Orphaned Conversations
+            </button>
+            <div id="results-LINK_ORPHANED_CONVERSATIONS" class="results"></div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 4: Verify Everything</h3>
+            <p>After running the above steps, click below to return to the app and check your bins</p>
+            <button class="action-btn" onclick="window.location.href = '/'">
+                🏠 Return to App
+            </button>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Advanced: Manual Bin Fix</h2>
+        <p>If you have a specific bin with wrong team assignment, enter its details:</p>
+        <input type="text" id="binKey" placeholder="Bin key (e.g., bin:undefined)" style="width: 300px; padding: 5px;">
+        <input type="text" id="binId" placeholder="Bin ID (optional)" style="width: 200px; padding: 5px;">
+        <button class="action-btn" onclick="fixBinTeam()">Fix Bin Team</button>
+        <div id="results-FIX_BIN_TEAM" class="results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>💡 Manual Recovery in Cloudflare Dashboard</h2>
+        <p>If the automated tools don't work, you can manually recover in the Cloudflare dashboard:</p>
+        <pre>
+// 1. Find all conversations without proper bins:
+const convs = await env.CONVERSATIONS.list({ limit: 1000 });
+for (const key of convs.keys) {
+  const conv = await env.CONVERSATIONS.get(key.name, 'json');
+  console.log(conv.name, conv.binId, conv.messages?.length);
+}
+
+// 2. Create a missing bin manually:
+const newBin = {
+  id: crypto.randomUUID(),
+  name: "Michael's Original Prompt",
+  teamId: "morpheus-systems",
+  createdBy: "vie@morpheus.systems",
+  createdAt: new Date().toISOString(),
+  conversationCount: 0
+};
+await env.BINS.put(`bin:morpheus-systems:${newBin.id}`, JSON.stringify(newBin));
+
+// 3. Link a conversation to a bin:
+const conv = await env.CONVERSATIONS.get('conversation:some-id', 'json');
+conv.binId = 'the-correct-bin-id';
+await env.CONVERSATIONS.put('conversation:some-id', JSON.stringify(conv));
+        </pre>
+    </div>
+
+    <script>
+        const token = sessionStorage.getItem('tuneforge_session');
+        
+        if (!token) {
+            alert('Not logged in! Redirecting to login...');
+            window.location.href = '/login.html';
+        }
+        
+        async function runAction(action) {
+            const resultsEl = document.getElementById(`results-${action}`);
+            resultsEl.style.display = 'block';
+            resultsEl.innerHTML = '<span class="warning">Running...</span>';
+            
+            try {
+                const response = await fetch('/api/manual-migrate', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    resultsEl.innerHTML = `<span class="error">Error: ${data.error}</span>`;
+                    return;
+                }
+                
+                if (data.success) {
+                    resultsEl.innerHTML = `<span class="success">✅ Success!</span>\n\n`;
+                    resultsEl.innerHTML += formatResults(action, data);
+                } else {
+                    resultsEl.innerHTML = `<span class="error">Failed: ${data.error || 'Unknown error'}</span>`;
+                }
+                
+            } catch (error) {
+                resultsEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function fixBinTeam() {
+            const binKey = document.getElementById('binKey').value.trim();
+            const binId = document.getElementById('binId').value.trim();
+            
+            if (!binKey) {
+                alert('Please enter a bin key');
+                return;
+            }
+            
+            const resultsEl = document.getElementById('results-FIX_BIN_TEAM');
+            resultsEl.style.display = 'block';
+            resultsEl.innerHTML = '<span class="warning">Fixing bin team...</span>';
+            
+            try {
+                const response = await fetch('/api/manual-migrate', {
+                    method: 'POST',
+                    headers: { 
+                        'X-Session-Token': token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        action: 'FIX_BIN_TEAM',
+                        binKey,
+                        binId 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultsEl.innerHTML = `<span class="success">✅ Fixed!</span>\n`;
+                    resultsEl.innerHTML += `Old key: ${data.oldKey}\n`;
+                    resultsEl.innerHTML += `New key: ${data.newKey}\n`;
+                    resultsEl.innerHTML += `Bin: ${data.bin.name}`;
+                } else {
+                    resultsEl.innerHTML = `<span class="error">Failed: ${data.error || 'Unknown error'}</span>`;
+                }
+                
+            } catch (error) {
+                resultsEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        function formatResults(action, data) {
+            let html = '';
+            
+            switch (action) {
+                case 'CREATE_MISSING_BINS':
+                    if (data.created) {
+                        data.created.forEach(item => {
+                            if (item.status === 'created') {
+                                html += `✅ Created: ${item.name} (${item.id})\n`;
+                            } else {
+                                html += `ℹ️ ${item.name}: ${item.status}\n`;
+                            }
+                        });
+                    }
+                    break;
+                    
+                case 'FIX_CONVERSATION_COUNT':
+                    if (data.updated && data.updated.length > 0) {
+                        data.updated.forEach(item => {
+                            html += `📊 ${item.bin}: ${item.oldCount} → ${item.newCount}\n`;
+                        });
+                    } else {
+                        html += 'All conversation counts are correct!';
+                    }
+                    break;
+                    
+                case 'LINK_ORPHANED_CONVERSATIONS':
+                    if (data.linked && data.linked.length > 0) {
+                        html += 'Linked conversations:\n';
+                        data.linked.forEach(item => {
+                            html += `  ✅ "${item.conversation}" → ${item.linkedTo}\n`;
+                        });
+                    }
+                    if (data.stillOrphaned && data.stillOrphaned.length > 0) {
+                        html += '\nStill orphaned:\n';
+                        data.stillOrphaned.forEach(item => {
+                            html += `  ⚠️ ${item.name} (${item.messageCount} messages)\n`;
+                        });
+                    }
+                    break;
+            }
+            
+            html += '\n' + JSON.stringify(data, null, 2);
+            return html;
+        }
+    </script>
+</body>
+</html>
