@@ -3202,11 +3202,11 @@ class TuneForgeUltimate {
                     // Reload bins to reflect visibility changes
                     await this.loadBins();
                     
-                    this.showMessage('Bin settings updated successfully', 'success');
+                    this.showNotification('Bin settings updated successfully', 'success');
                     cleanup();
                 } catch (error) {
                     console.error('Error updating bin settings:', error);
-                    this.showMessage('Failed to update settings: ' + error.message, 'error');
+                    this.showNotification('Failed to update settings: ' + error.message, 'error');
                 }
             });
             
@@ -3218,7 +3218,7 @@ class TuneForgeUltimate {
             
         } catch (error) {
             console.error('Error showing bin settings:', error);
-            this.showMessage('Failed to load bin settings: ' + error.message, 'error');
+            this.showNotification('Failed to load bin settings: ' + error.message, 'error');
         }
     }
     
