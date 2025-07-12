@@ -1568,6 +1568,13 @@ class TuneForgeUltimate {
     
     showLoomLoading() {
         const flow = document.getElementById('conversationFlow');
+        
+        // Remove any existing loading loom first
+        const existingLoading = flow.querySelector('.loading-loom');
+        if (existingLoading) {
+            existingLoading.remove();
+        }
+        
         const loadingEl = document.createElement('div');
         loadingEl.className = 'message-block loading-loom';
         loadingEl.innerHTML = `
@@ -2452,6 +2459,20 @@ class TuneForgeUltimate {
     
     // Regeneration
     async regenerateAll() {
+        // Check if there's an active loom that needs to be selected first
+        if (this.activeLoom) {
+            this.showNotification('Please select a response first', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Add pulsing animation to draw attention
+                loomElement.classList.add('pulse-warning');
+                setTimeout(() => loomElement.classList.remove('pulse-warning'), 2000);
+            }
+            return;
+        }
+        
         // Prevent duplicate calls
         if (this.isGenerating) {
             this.showNotification('Please wait for the current request to complete', 'warning');
@@ -2501,6 +2522,9 @@ class TuneForgeUltimate {
         if (lastAssistantBlock) {
             lastAssistantBlock.remove();
         }
+        
+        // Clear any existing loom state since we're regenerating
+        this.activeLoom = null;
         
         // Remove from messages array
         this.currentMessages = this.currentMessages.slice(0, lastAssistantIndex);
