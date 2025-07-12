@@ -3185,6 +3185,9 @@ class TuneForgeUltimate {
             document.getElementById('settingsSave').addEventListener('click', async () => {
                 const selectedVisibility = modal.querySelector('input[name="visibility"]:checked').value;
                 
+                // Close modal immediately for visual feedback
+                cleanup();
+                
                 try {
                     const updateResponse = await this.fetchWithAuth(`${this.apiBase}/bin-settings?binId=${bin.id}`, {
                         method: 'PUT',
@@ -3199,11 +3202,12 @@ class TuneForgeUltimate {
                     // Update local bin data
                     bin.visibility = selectedVisibility;
                     
+                    // Show success notification
+                    this.showNotification('Bin settings updated successfully', 'success');
+                    
                     // Reload bins to reflect visibility changes
                     await this.loadBins();
                     
-                    this.showNotification('Bin settings updated successfully', 'success');
-                    cleanup();
                 } catch (error) {
                     console.error('Error updating bin settings:', error);
                     this.showNotification('Failed to update settings: ' + error.message, 'error');
