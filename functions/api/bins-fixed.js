@@ -151,3 +151,83 @@ export async function onRequestPost(context) {
     });
   }
 }
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const binId = url.searchParams.get('id');
+  
+  try {
+    // Authenticate
+    const auth = await authenticate(request, env);
+    if (auth.error) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { user } = auth;
+    
+    if (!binId) {
+      return new Response(JSON.stringify({ error: 'Bin ID required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Get the bin to check ownership
+    const binKey = `bin:${user.teamId}:${binId}`;
+    const bin = await env.BINS.get(binKey, 'json');
+    
+    if (!bin) {
+      return new Response(JSON.stringify({ error: 'Bin not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Check if user has permission to delete (must be creator or admin)
+    if (bin.createdBy !== user.email && user.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Only the bin creator can delete this bin' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Delete all conversations in this bin
+    const convList = await env.CONVERSATIONS.list({ prefix: `${binId}:` });
+    for (const key of convList.keys) {
+      await env.CONVERSATIONS.delete(key.name);
+    }
+    
+    // Also check for conversations with binId field
+    const allConvList = await env.CONVERSATIONS.list({ limit: 1000 });
+    for (const key of allConvList.keys) {
+      const conv = await env.CONVERSATIONS.get(key.name, 'json');
+      if (conv && conv.binId === binId) {
+        await env.CONVERSATIONS.delete(key.name);
+      }
+    }
+    
+    // Delete the bin
+    await env.BINS.delete(binKey);
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Bin and all associated conversations deleted successfully'
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error('Error in bins-fixed DELETE:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: error.stack
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}

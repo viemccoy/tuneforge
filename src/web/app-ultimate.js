@@ -918,7 +918,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins/${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed?id=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
