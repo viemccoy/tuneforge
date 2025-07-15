@@ -448,6 +448,165 @@ TuneForge has evolved from a simple fine-tuning dataset builder into a comprehen
 3. **Medium-term**: Implement collaborative features (real-time editing, comments)
 4. **Long-term**: Add analytics dashboard for dataset quality metrics
 
+## Recent Enhancements (January 2025)
+
+### 16. Bin Visibility Settings
+- **Feature**: Personal/Team visibility toggle for bins
+- **Implementation**:
+  - Created `/api/bin-settings` endpoint for managing visibility
+  - Added settings button `[...]` to each bin header (ASCII-only design)
+  - Streamlined modal with toggle switch for PERSONAL | TEAM options
+  - Only bin creators can change settings
+  - Settings modal closes immediately on save for visual feedback
+- **UI Design**:
+  - Compact modal showing only essential info
+  - Creator shown as `@username` format
+  - READ-ONLY indicator for non-editable bins
+  - Smooth transitions and Matrix-green styling
+
+### 17. Multiple Completions Generation
+- **Feature**: Generate N completions from each selected model
+- **Implementation**:
+  - Added completions counter (1-10) styled like max tokens control
+  - Backend generates N responses for EACH model (e.g., 5 completions × 2 models = 10 responses)
+  - Each completion labeled as "model-name (X/Y)"
+  - All completions from same model share usage statistics
+- **Benefits**:
+  - More variety in responses
+  - Better chance of finding ideal completion
+  - Works with all supported models
+
+### 18. UNDO Functionality
+- **Feature**: Remove last message exchange and edit
+- **Implementation**:
+  - UNDO button in Actions section
+  - Removes last user-assistant message pair
+  - Restores user message to input box
+  - Automatically saves updated conversation
+  - Handles edge cases (no assistant response, empty conversation)
+- **Visual Design**:
+  - Normal styling by default
+  - Orange/warning styling only on hover
+  - Clear success notifications
+
+### 19. Bug Fixes and Improvements
+- **Removed VIEW ALL button** - Unclear functionality
+- **Fixed REGENERATE ALL protection** - Prevents creating duplicate looms
+- **Fixed bin deletion** - Added DELETE endpoint to bins-fixed.js
+- **Fixed method name errors** - Changed showMessage to showNotification
+- **Improved error handling** - Better cleanup of loading states
+
+### 20. Data Recovery Enhancements
+- **Recalculate Counts Tool** (`/recalculate-counts.html`):
+  - Fixes conversation count mismatches
+  - Scans using both key prefix and binId field methods
+  - Updates all bins with correct counts
+  
+- **Normalize Keys Tool** (`/normalize-keys.html`):
+  - Standardizes all key formats
+  - Ensures bins use `bin:teamId:binId` format
+  - Adds missing binId fields to conversations
+  - Assigns orphaned bins to teams
+
+- **Admin Dashboard** (`/admin-dashboard.html`):
+  - Central hub for all admin tools
+  - Live statistics with mismatch detection
+  - Quick actions for common tasks
+  - Real-time health monitoring
+
+## Testing Checklist
+
+- [x] Conversation name persistence across saves
+- [x] Presence tracking updates in real-time
+- [x] Response selection enforcement works
+- [x] Regeneration uses current parameters
+- [x] No button overlap issues
+- [x] Rate limiting prevents spam
+- [x] Session timeout warnings appear
+- [x] Network status indicator works
+- [x] All animations perform smoothly
+- [x] Security validations in place
+- [x] User authentication and session management
+- [x] Team-based bin access control
+- [x] Migration tool for existing data
+- [x] Fixed endpoints with inline authentication
+- [x] Message recovery system
+- [x] Bin selection and display (fixed with removal of local recovery)
+- [x] Conversation persistence after message weaving (saves immediately to server)
+- [x] Migration fix tool resolves undefined bin IDs
+- [x] All 4 bins accessible after fix-migration
+- [x] Conversation loading handles both legacy and new formats
+- [x] Deep scan identifies all orphaned data
+- [x] Reconstruction tool recovers missing bins from patterns
+- [x] Bin visibility settings (personal/team)
+- [x] Multiple completions generation
+- [x] UNDO functionality
+- [x] Bin deletion with proper cleanup
+- [x] REGENERATE ALL protection against active looms
+- [x] Chain of Thought (COT) token exclusion
+
+### 21. Chain of Thought (COT) Token Exclusion
+- **Problem**: COT models like Grok 4, Gemini 2.5 Pro, and Deepseek R1 include reasoning traces that shouldn't count toward token limits
+- **Solution**: 
+  - Created COT model detection system in generate.js
+  - Extracts reasoning traces using model-specific patterns:
+    - Grok 4: `<thinking>` tags
+    - Deepseek R1: `<reasoning>` tags
+    - Gemini: Common reasoning patterns like "Let me think..."
+  - Separates main content from reasoning traces
+  - Adjusts token counts to exclude reasoning tokens
+  - Shows adjusted counts in UI: "X tokens (excl. Y reasoning)"
+- **UI Enhancement**:
+  - Added collapsible reasoning trace sections
+  - Shows [COT] indicator next to model names
+  - Toggle to show/hide reasoning traces
+  - Preserves full content for dataset export
+- **Technical Details**:
+  - `extractCOTContent()` function handles different COT formats
+  - Reasoning traces saved separately from main content
+  - Token counts adjusted in real-time
+  - Edit functionality preserves COT structure
+  - Loaded conversations properly display reasoning toggles
+
+## Current Project Status & Trajectory
+
+### What We've Built
+TuneForge has evolved from a simple fine-tuning dataset builder into a comprehensive, production-ready system with:
+- Multi-user support with team-based data isolation
+- Sophisticated bin-based organization for datasets
+- Real-time presence tracking showing active viewers
+- Conversation branching with the Loom navigator
+- Multi-model support including GPT-4, Claude, Gemini, and X.AI models
+- Comprehensive data recovery and migration tools
+- Beautiful cyberpunk Matrix-inspired UI with attention to detail
+- Personal/team visibility controls for bins
+- Multiple completion generation for better response variety
+- UNDO functionality for easy message editing
+- Robust error handling and state management
+
+### Key Technical Achievements
+1. **Authentication System** - Worked around Cloudflare Pages middleware limitations with inline auth
+2. **Data Migration** - Built multiple layers of recovery tools to handle legacy data formats
+3. **Backward Compatibility** - Conversations work with both key-prefix and binId field patterns
+4. **Error Recovery** - Multiple fallback mechanisms ensure data is never lost
+5. **Developer Tools** - Comprehensive suite of diagnostic and recovery pages
+6. **State Management** - Proper handling of active looms, generation states, and UI updates
+7. **User Experience** - Instant feedback, clear notifications, and intuitive controls
+
+### Current Data Architecture
+- **Bins**: Stored as `bin:teamId:binId` in KV
+- **Conversations**: Support both legacy (`binId:convId`) and new (separate `binId` field) formats
+- **Users**: Stored as `user:email` with team assignments
+- **Sessions**: Stored as `session:token` with no expiry
+- **Teams**: Currently single team (morpheus-systems) but architecture supports multiple
+- **Visibility**: Bins can be personal (creator only) or team (all team members)
+
+### Next Steps & Future Direction
+1. **Immediate**: Ensure all conversation loading works after deployment
+2. **Short-term**: Add export functionality for different fine-tuning formats
+3. **Medium-term**: Implement collaborative features (real-time editing, comments)
+4. **Long-term**: Add analytics dashboard for dataset quality metrics
+
 ## Notes
 
 - The app is designed for infrastructure-level use, not public deployment
@@ -458,3 +617,5 @@ TuneForge has evolved from a simple fine-tuning dataset builder into a comprehen
 - Sessions persist indefinitely (no expiry) for better UX
 - Data recovery tools ensure no conversations are ever lost
 - Backward compatibility maintained throughout all migrations
+- All UI elements use ASCII characters - no emojis
+- Comprehensive error handling prevents conversation glitches

@@ -1,5 +1,132 @@
 /* Ultimate UI Enhancements - Merging Original + Bin Management */
 
+/* COT Reasoning Trace Styles */
+.reasoning-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background: rgba(0, 255, 65, 0.05);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: var(--matrix-green-dim);
+}
+
+.reasoning-toggle:hover {
+    background: rgba(0, 255, 65, 0.1);
+    border-color: rgba(0, 255, 65, 0.4);
+    color: var(--matrix-green);
+}
+
+.toggle-icon {
+    font-size: 0.8em;
+    transition: transform 0.2s ease;
+}
+
+.reasoning-content {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 65, 0.15);
+    border-radius: 0;
+}
+
+.reasoning-header {
+    color: var(--matrix-green-bright);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.reasoning-text {
+    color: var(--matrix-green-dim);
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    opacity: 0.8;
+}
+
+/* COT Model Indicator in Meta */
+.completion-model [COT] {
+    color: var(--matrix-green-bright);
+    font-weight: bold;
+}
+
+/* Message Recovery Styles */
+.message-recovery {
+    margin: 1rem;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--error-color);
+    animation: errorPulse 2s ease-in-out infinite;
+}
+
+@keyframes errorPulse {
+    0%, 100% { border-color: var(--error-color); box-shadow: 0 0 10px rgba(255, 0, 0, 0.3); }
+    50% { border-color: rgba(255, 0, 0, 0.5); box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); }
+}
+
+.recovery-header {
+    color: var(--error-color);
+    font-family: 'Courier New', monospace;
+    font-size: 1em;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.recovery-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.btn-recovery {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--matrix-green);
+    color: var(--matrix-green);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.btn-recovery:hover {
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-recovery.danger {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.btn-recovery.danger:hover {
+    background: rgba(255, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+}
+
+.message-error {
+    color: var(--error-color);
+    font-size: 0.85em;
+    margin-top: 0.5rem;
+    font-family: 'Courier New', monospace;
+    opacity: 0.8;
+}
+
 /* User Authentication Styles */
 .auth-message {
     color: var(--matrix-green);

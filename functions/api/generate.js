@@ -3,6 +3,72 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// List of models that use Chain of Thought reasoning
+const COT_MODELS = [
+  'x-ai/grok-4',
+  'gemini-2.5-pro',
+  'models/gemini-2.5-pro',
+  'deepseek/deepseek-r1'
+];
+
+// Function to check if a model uses COT
+function isCOTModel(modelId) {
+  return COT_MODELS.some(cotModel => modelId.includes(cotModel));
+}
+
+// Function to extract reasoning trace from COT response
+function extractCOTContent(content, modelId) {
+  // Different models use different formats for reasoning traces
+  
+  // Grok models typically use <thinking> tags
+  if (modelId.includes('grok')) {
+    const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/);
+    if (thinkingMatch) {
+      const reasoning = thinkingMatch[1];
+      const mainContent = content.replace(/<thinking>[\s\S]*?<\/thinking>/, '').trim();
+      return { reasoning, mainContent, fullContent: content };
+    }
+  }
+  
+  // Deepseek R1 uses <reasoning> tags
+  if (modelId.includes('deepseek')) {
+    const reasoningMatch = content.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+    if (reasoningMatch) {
+      const reasoning = reasoningMatch[1];
+      const mainContent = content.replace(/<reasoning>[\s\S]*?<\/reasoning>/, '').trim();
+      return { reasoning, mainContent, fullContent: content };
+    }
+  }
+  
+  // Gemini might use different markers or none at all
+  if (modelId.includes('gemini')) {
+    // Check for common reasoning patterns
+    const reasoningPatterns = [
+      /^(Let me think[\s\S]*?)\n\n(?=\w)/,
+      /^(I need to[\s\S]*?)\n\n(?=\w)/,
+      /^(First,[\s\S]*?)\n\n(?=The answer|Based on|To answer)/
+    ];
+    
+    for (const pattern of reasoningPatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        const reasoning = match[1];
+        const mainContent = content.substring(reasoning.length).trim();
+        return { reasoning, mainContent, fullContent: content };
+      }
+    }
+  }
+  
+  // If no reasoning trace found, return content as-is
+  return { reasoning: '', mainContent: content, fullContent: content };
+}
+
+// Function to estimate tokens for text (used when API doesn't provide counts)
+function estimateTokens(text) {
+  // Rough approximation: 1 token ≈ 4 characters
+  return Math.ceil(text.length / 4);
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   
@@ -75,13 +141,36 @@ export async function onRequestPost(context) {
           
           const completion = await openai.chat.completions.create(params);
           
-          return {
+          const rawContent = completion.choices[0].message.content;
+          let responseData = {
             model: modelId,
-            content: completion.choices[0].message.content,
+            content: rawContent,
             usage: completion.usage,
             completionIndex: completionIndex + 1,
             totalCompletions: n || 1
           };
+          
+          // Process COT models
+          if (isCOTModel(modelId)) {
+            const cotData = extractCOTContent(rawContent, modelId);
+            responseData.content = cotData.mainContent;
+            responseData.reasoning = cotData.reasoning;
+            responseData.fullContent = cotData.fullContent;
+            responseData.isCOT = true;
+            
+            // Adjust token counts to exclude reasoning
+            if (completion.usage && cotData.reasoning) {
+              const reasoningTokens = estimateTokens(cotData.reasoning);
+              responseData.usage = {
+                ...completion.usage,
+                completion_tokens: Math.max(1, completion.usage.completion_tokens - reasoningTokens),
+                total_tokens: Math.max(1, completion.usage.total_tokens - reasoningTokens)
+              };
+              responseData.reasoningTokens = reasoningTokens;
+            }
+          }
+          
+          return responseData;
         } else if (modelId.startsWith('claude') && anthropic) {
           const completion = await anthropic.messages.create({
             model: modelId,
@@ -117,13 +206,36 @@ export async function onRequestPost(context) {
             max_tokens: maxTokens || 1000
           });
           
-          return {
+          const rawContent = completion.choices[0].message.content;
+          let responseData = {
             model: modelId,
-            content: completion.choices[0].message.content,
+            content: rawContent,
             usage: completion.usage,
             completionIndex: completionIndex + 1,
             totalCompletions: n || 1
           };
+          
+          // Process COT models (Grok 4, Deepseek R1)
+          if (isCOTModel(modelId)) {
+            const cotData = extractCOTContent(rawContent, modelId);
+            responseData.content = cotData.mainContent;
+            responseData.reasoning = cotData.reasoning;
+            responseData.fullContent = cotData.fullContent;
+            responseData.isCOT = true;
+            
+            // Adjust token counts to exclude reasoning
+            if (completion.usage && cotData.reasoning) {
+              const reasoningTokens = estimateTokens(cotData.reasoning);
+              responseData.usage = {
+                ...completion.usage,
+                completion_tokens: Math.max(1, completion.usage.completion_tokens - reasoningTokens),
+                total_tokens: Math.max(1, completion.usage.total_tokens - reasoningTokens)
+              };
+              responseData.reasoningTokens = reasoningTokens;
+            }
+          }
+          
+          return responseData;
         } else if ((modelId.includes('gemini') || modelId.startsWith('models/gemini')) && google) {
           // Handle Google Gemini models
           const modelName = modelId.replace('models/', ''); // Remove 'models/' prefix if present
@@ -157,16 +269,42 @@ export async function onRequestPost(context) {
           const result = await chat.sendMessage(currentPrompt);
           const response = await result.response;
           
-          return {
+          const rawContent = response.text();
+          let responseData = {
             model: modelId,
-            content: response.text(),
+            content: rawContent,
             usage: {
               // Gemini doesn't provide token counts in the same way
-              total_tokens: Math.ceil((currentPrompt.length + response.text().length) / 4)
+              total_tokens: estimateTokens(currentPrompt + rawContent)
             },
             completionIndex: completionIndex + 1,
             totalCompletions: n || 1
           };
+          
+          // Process COT for Gemini
+          if (isCOTModel(modelId)) {
+            const cotData = extractCOTContent(rawContent, modelId);
+            responseData.content = cotData.mainContent;
+            responseData.reasoning = cotData.reasoning;
+            responseData.fullContent = cotData.fullContent;
+            responseData.isCOT = true;
+            
+            // Adjust estimated token counts
+            if (cotData.reasoning) {
+              const reasoningTokens = estimateTokens(cotData.reasoning);
+              const mainContentTokens = estimateTokens(cotData.mainContent);
+              const promptTokens = estimateTokens(currentPrompt);
+              
+              responseData.usage = {
+                prompt_tokens: promptTokens,
+                completion_tokens: mainContentTokens,
+                total_tokens: promptTokens + mainContentTokens
+              };
+              responseData.reasoningTokens = reasoningTokens;
+            }
+          }
+          
+          return responseData;
         } else {
           return {
             model: modelId,

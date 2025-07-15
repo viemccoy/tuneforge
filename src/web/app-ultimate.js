@@ -75,7 +75,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             // Check if we have a session token
-            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
             
             if (!sessionToken) {
                 // No token, redirect to login
@@ -90,6 +90,7 @@ class TuneForgeUltimate {
                 if (!response.ok) {
                     // Invalid token, redirect to login
                     sessionStorage.removeItem('tuneforge_session');
+                    localStorage.removeItem('tuneforge_session');
                     window.location.href = '/login.html';
                     return;
                 }
@@ -1005,6 +1006,7 @@ class TuneForgeUltimate {
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
                 { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
+                { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', provider: 'anthropic' },
                 { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
                 { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
@@ -1346,7 +1348,7 @@ class TuneForgeUltimate {
         this.updateConversationNameDisplay();
     }
     
-    async sendMessage() {
+    async sendMessage(messageOverride = null, isRetry = false) {
         // Prevent duplicate calls
         if (this.isGenerating) {
             this.showNotification('Please wait for the current request to complete', 'warning');
@@ -1374,7 +1376,7 @@ class TuneForgeUltimate {
             return;
         }
         
-        const messageInput = document.getElementById('userMessage').value;
+        const messageInput = messageOverride || document.getElementById('userMessage').value;
         
         // Validate and sanitize input
         let message;
@@ -1430,8 +1432,10 @@ class TuneForgeUltimate {
             await this.saveConversation(true);
         }
         
-        // Clear input
-        document.getElementById('userMessage').value = '';
+        // Clear input (unless it's a retry)
+        if (!isRetry) {
+            document.getElementById('userMessage').value = '';
+        }
         
         // Get parameters
         const temperature = parseFloat(document.getElementById('temperature').value);
@@ -1550,12 +1554,47 @@ class TuneForgeUltimate {
         
         const messageEl = document.createElement('div');
         messageEl.className = 'message-block';
-        messageEl.innerHTML = `
+        
+        // For COT assistant messages, extract main content from fullContent
+        let displayContent = message.content;
+        let reasoning = '';
+        
+        if (message.role === 'assistant' && message.isCOT && message.content.includes('<reasoning>')) {
+            // Extract reasoning from saved full content
+            const reasoningMatch = message.content.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+            if (reasoningMatch) {
+                reasoning = reasoningMatch[1];
+                displayContent = message.content.replace(/<reasoning>[\s\S]*?<\/reasoning>/, '').trim();
+            }
+        } else if (message.role === 'assistant' && message.reasoning) {
+            // Use separate reasoning field if available
+            reasoning = message.reasoning;
+            displayContent = message.content;
+        }
+        
+        let messageHTML = `
             <div class="message ${message.role}">
-                <div class="message-role">${message.role.toUpperCase()}</div>
-                <div class="message-content">${this.escapeHtml(message.content)}</div>
-            </div>
+                <div class="message-role">${message.role.toUpperCase()}${message.model ? ` (${message.model})` : ''}${message.isCOT ? ' [COT]' : ''}</div>
+                <div class="message-content">${this.escapeHtml(displayContent)}</div>
         `;
+        
+        // Add reasoning toggle for COT messages
+        if (message.role === 'assistant' && reasoning) {
+            const messageIndex = this.currentMessages.indexOf(message);
+            messageHTML += `
+                <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning('loaded-${messageIndex}')">
+                    <span class="toggle-icon" id="reasoning-icon-loaded-${messageIndex}">▶</span>
+                    <span class="toggle-text">Show Reasoning Trace</span>
+                </div>
+                <div class="reasoning-content" id="reasoning-loaded-${messageIndex}" style="display: none;">
+                    <div class="reasoning-header">[REASONING TRACE]</div>
+                    <div class="reasoning-text">${this.escapeHtml(reasoning)}</div>
+                </div>
+            `;
+        }
+        
+        messageHTML += `</div>`;
+        messageEl.innerHTML = messageHTML;
         
         flow.appendChild(messageEl);
         flow.scrollTop = flow.scrollHeight;
@@ -1603,15 +1642,19 @@ class TuneForgeUltimate {
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
-        if (!data.responses || data.responses.length === 0) {
+        if (!data.responses || data.responses.length === 0 || data.responses.every(r => r.error)) {
             this.showNotification('No responses generated - your message has been saved', 'error');
             
-            // Add recovery option
+            // Add recovery option with better styling
             const recoveryEl = document.createElement('div');
             recoveryEl.className = 'message-recovery';
             recoveryEl.innerHTML = `
-                <button class="btn-recovery" onclick="app.retryLastMessage()">↻ Retry</button>
-                <button class="btn-recovery" onclick="app.removeLastMessage()">✕ Remove</button>
+                <div class="recovery-header">[GENERATION FAILED]</div>
+                <div class="recovery-actions">
+                    <button class="btn-recovery" onclick="tuneforge.retryLastMessage()">↻ RETRY</button>
+                    <button class="btn-recovery" onclick="tuneforge.editLastMessage()">✎ EDIT</button>
+                    <button class="btn-recovery danger" onclick="tuneforge.removeLastMessage()">✕ REMOVE</button>
+                </div>
             `;
             flow.appendChild(recoveryEl);
             return;
@@ -1709,13 +1752,24 @@ class TuneForgeUltimate {
     createCompletionCard(response, index) {
         const isError = response.error || !response.content;
         const escapedContent = !isError ? this.escapeHtml(response.content) : '';
+        const escapedReasoning = response.reasoning ? this.escapeHtml(response.reasoning) : '';
+        
+        // For COT models, show adjusted token counts
+        let tokenDisplay = '';
+        if (response.usage) {
+            if (response.isCOT && response.reasoningTokens) {
+                tokenDisplay = `${response.usage.total_tokens} tokens (excl. ${response.reasoningTokens} reasoning)`;
+            } else {
+                tokenDisplay = `${response.usage.total_tokens} tokens`;
+            }
+        }
         
         return `
             <div class="completion-card ${index === 0 ? 'active' : ''} ${isError ? 'error' : ''}" data-index="${index}">
                 <div class="completion-meta">
-                    <div class="completion-model">${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}</div>
+                    <div class="completion-model">${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}${response.isCOT ? ' [COT]' : ''}</div>
                     <div class="completion-stats">
-                        ${response.usage ? `${response.usage.total_tokens} tokens` : ''}
+                        ${tokenDisplay}
                     </div>
                 </div>
                 <div class="completion-content" id="content-${index}">
@@ -1723,6 +1777,16 @@ class TuneForgeUltimate {
                         `<div class="error-message">${response.error || 'No response generated'}</div>` :
                         escapedContent
                     }
+                    ${response.reasoning ? `
+                        <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning(${index})">
+                            <span class="toggle-icon" id="reasoning-icon-${index}">▶</span>
+                            <span class="toggle-text">Show Reasoning Trace</span>
+                        </div>
+                        <div class="reasoning-content" id="reasoning-${index}" style="display: none;">
+                            <div class="reasoning-header">[REASONING TRACE]</div>
+                            <div class="reasoning-text">${escapedReasoning}</div>
+                        </div>
+                    ` : ''}
                 </div>
                 ${!isError ? `
                 <div class="response-actions">
@@ -1868,22 +1932,45 @@ class TuneForgeUltimate {
             timestamp: new Date().toISOString()
         });
         
-        // Add to messages
+        // Add to messages - for COT models, save the full content
         this.currentMessages.push({
             role: 'assistant',
-            content: response.content,
-            model: response.model
+            content: response.isCOT && response.fullContent ? response.fullContent : response.content,
+            model: response.model,
+            isCOT: response.isCOT,
+            reasoning: response.reasoning,
+            usage: response.usage,
+            reasoningTokens: response.reasoningTokens
         });
         
         // Replace loom with message
         const messageEl = document.createElement('div');
         messageEl.className = 'message-block';
-        messageEl.innerHTML = `
+        
+        // Build message HTML with COT support
+        let messageHTML = `
             <div class="message assistant">
-                <div class="message-role">ASSISTANT (${response.model})</div>
+                <div class="message-role">ASSISTANT (${response.model})${response.isCOT ? ' [COT]' : ''}</div>
                 <div class="message-content">${this.escapeHtml(response.content)}</div>
-            </div>
         `;
+        
+        // Add reasoning toggle if it's a COT response
+        if (response.isCOT && response.reasoning) {
+            const messageIndex = this.currentMessages.length - 1; // Get the index of the message we just added
+            messageHTML += `
+                <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning('msg-${messageIndex}')">
+                    <span class="toggle-icon" id="reasoning-icon-msg-${messageIndex}">▶</span>
+                    <span class="toggle-text">Show Reasoning Trace</span>
+                </div>
+                <div class="reasoning-content" id="reasoning-msg-${messageIndex}" style="display: none;">
+                    <div class="reasoning-header">[REASONING TRACE]</div>
+                    <div class="reasoning-text">${this.escapeHtml(response.reasoning)}</div>
+                </div>
+            `;
+        }
+        
+        messageHTML += `</div>`;
+        messageEl.innerHTML = messageHTML;
         
         this.activeLoom.element.replaceWith(messageEl);
         this.activeLoom = null;
@@ -1902,6 +1989,21 @@ class TuneForgeUltimate {
         
         // Focus input for next message
         document.getElementById('userMessage').focus();
+    }
+    
+    toggleReasoning(index) {
+        const reasoningDiv = document.getElementById(`reasoning-${index}`);
+        const icon = document.getElementById(`reasoning-icon-${index}`);
+        
+        if (reasoningDiv) {
+            if (reasoningDiv.style.display === 'none') {
+                reasoningDiv.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                reasoningDiv.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
     }
     
     editResponse(index) {
@@ -1928,16 +2030,41 @@ class TuneForgeUltimate {
             this.activeLoom.responses[index].content = newContent;
             this.activeLoom.responses[index].edited = true;
             
+            // If this was a COT response, update fullContent too
+            if (this.activeLoom.responses[index].isCOT) {
+                this.activeLoom.responses[index].fullContent = newContent + 
+                    (this.activeLoom.responses[index].reasoning ? 
+                     `\n\n<reasoning>${this.activeLoom.responses[index].reasoning}</reasoning>` : '');
+            }
+            
             // Update display
             const contentEl = document.getElementById(`content-${index}`);
             if (contentEl) {
-                contentEl.innerHTML = this.escapeHtml(newContent);
+                // Find the actual content div (before reasoning toggle if exists)
+                const reasoningToggle = contentEl.querySelector('.reasoning-toggle');
+                if (reasoningToggle) {
+                    // Insert edited content before reasoning toggle
+                    const contentDiv = document.createElement('div');
+                    contentDiv.innerHTML = this.escapeHtml(newContent);
+                    contentEl.innerHTML = '';
+                    contentEl.appendChild(contentDiv);
+                    contentEl.appendChild(reasoningToggle);
+                    
+                    // Re-add reasoning content if it exists
+                    const reasoningContent = document.getElementById(`reasoning-${index}`);
+                    if (reasoningContent) {
+                        contentEl.appendChild(reasoningContent);
+                    }
+                } else {
+                    contentEl.innerHTML = this.escapeHtml(newContent);
+                }
             }
             
             // Update model label to show (edited)
             const modelEl = document.querySelector(`.completion-card[data-index="${index}"] .completion-model`);
             if (modelEl && !modelEl.textContent.includes('(edited)')) {
-                modelEl.textContent += ' (edited)';
+                const cotIndicator = this.activeLoom.responses[index].isCOT ? ' [COT]' : '';
+                modelEl.innerHTML = `${this.activeLoom.responses[index].model} (edited)${cotIndicator}`;
             }
             
             // Hide editor
@@ -2459,6 +2586,15 @@ class TuneForgeUltimate {
     
     // Regeneration
     async regenerateAll() {
+        // Check if there's a recovery element (API error state)
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) {
+            // If there's a recovery element, use the retry functionality instead
+            this.retryLastMessage();
+            return;
+        }
+        
         // Check if there's an active loom that needs to be selected first
         if (this.activeLoom) {
             this.showNotification('Please select a response first', 'warning');
@@ -2701,6 +2837,71 @@ class TuneForgeUltimate {
         }, 1000);
     }
     
+    async retryLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Get the last user message
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            // Regenerate with the same message
+            await this.sendMessage(lastUserMessage.content, true);
+        }
+    }
+    
+    editLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Get the last user message and put it back in the input
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            // Remove the last message from the array and UI
+            this.currentMessages.pop();
+            const lastMessageBlock = flow.lastElementChild;
+            if (lastMessageBlock && lastMessageBlock.querySelector('.message.user')) {
+                lastMessageBlock.remove();
+            }
+            
+            // Put the message back in the input box
+            document.getElementById('userMessage').value = lastUserMessage.content;
+            document.getElementById('userMessage').focus();
+            
+            // Update turn count
+            const turnCount = Math.floor(this.currentMessages.length / 2);
+            document.getElementById('turnCount').textContent = turnCount;
+            
+            this.showNotification('Message moved back to input box for editing', 'info');
+        }
+    }
+    
+    removeLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Remove the last user message
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            this.currentMessages.pop();
+            const lastMessageBlock = flow.lastElementChild;
+            if (lastMessageBlock && lastMessageBlock.querySelector('.message.user')) {
+                lastMessageBlock.remove();
+            }
+            
+            // Update turn count
+            const turnCount = Math.floor(this.currentMessages.length / 2);
+            document.getElementById('turnCount').textContent = turnCount;
+            
+            this.showNotification('Message removed', 'info');
+        }
+    }
+    
     async undoLastMessage() {
         // Check if there's an active loom that needs to be selected first
         if (this.activeLoom) {
@@ -2721,6 +2922,22 @@ class TuneForgeUltimate {
             this.showNotification('No messages to undo', 'warning');
             return;
         }
+        
+        // Show confirmation dialog
+        const lastMessage = this.currentMessages[this.currentMessages.length - 1];
+        const isAssistant = lastMessage.role === 'assistant';
+        const messagePreview = lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '');
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Undo Last Message',
+            message: `Remove the last ${isAssistant ? 'assistant' : 'user'} message?`,
+            details: messagePreview,
+            confirmText: 'UNDO',
+            cancelText: 'CANCEL',
+            dangerous: false
+        });
+        
+        if (!confirmed) return;
         
         // Find the last user message index
         let lastUserIndex = -1;
