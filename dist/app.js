@@ -1013,7 +1013,8 @@ class TuneForgeUltimate {
                 { id: 'x-ai/grok-3', name: 'Grok 3', provider: 'openrouter' },
                 { id: 'x-ai/grok-3-mini', name: 'Grok 3 Mini', provider: 'openrouter' },
                 { id: 'x-ai/grok-4', name: 'Grok 4', provider: 'openrouter' },
-                { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' }
+                { id: 'deepseek/deepseek-r1', name: 'Deepseek R1', provider: 'openrouter' },
+                { id: 'moonshotai/kimi-k2', name: 'Kimi K2', provider: 'openrouter' }
             ];
         } else {
             // Request from server

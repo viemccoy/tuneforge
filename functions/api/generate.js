@@ -194,8 +194,8 @@ export async function onRequestPost(context) {
             completionIndex: completionIndex + 1,
             totalCompletions: n || 1
           };
-        } else if ((modelId.startsWith('deepseek') || modelId.startsWith('x-ai/grok')) && openrouter) {
-          // Handle Deepseek and Grok models through OpenRouter
+        } else if ((modelId.startsWith('deepseek') || modelId.startsWith('x-ai/grok') || modelId.startsWith('moonshotai')) && openrouter) {
+          // Handle Deepseek, Grok, and Moonshotai models through OpenRouter
           const completion = await openrouter.chat.completions.create({
             model: modelId,
             messages: [
