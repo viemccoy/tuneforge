@@ -3036,6 +3036,12 @@ class TuneForgeUltimate {
     }
     
     async undoLastMessage() {
+        // Prevent undo while generating
+        if (this.isGenerating) {
+            this.showNotification('Cannot undo while generating responses', 'warning');
+            return;
+        }
+        
         // Check if there's an active loom that needs to be selected first
         if (this.activeLoom) {
             this.showNotification('Please select a response first', 'warning');
@@ -3953,6 +3959,7 @@ class TuneForgeUltimate {
         document.getElementById('userMessage').disabled = true;
         document.getElementById('sendMessage').disabled = true;
         document.getElementById('regenerateLast').disabled = true;
+        document.getElementById('undoLast').disabled = true;
         
         // Add visual feedback
         document.getElementById('sendMessage').textContent = 'GENERATING...';
@@ -3963,12 +3970,20 @@ class TuneForgeUltimate {
             el.style.pointerEvents = 'none';
             el.style.opacity = '0.5';
         });
+        
+        // Visual feedback for undo button
+        const undoBtn = document.getElementById('undoLast');
+        if (undoBtn) {
+            undoBtn.classList.add('disabled');
+            undoBtn.title = 'Cannot undo while generating';
+        }
     }
     
     enableGenerationUI() {
         // Re-enable all input controls
         document.getElementById('userMessage').disabled = false;
         document.getElementById('sendMessage').disabled = false;
+        document.getElementById('undoLast').disabled = false;
         document.getElementById('regenerateLast').disabled = false;
         
         // Reset visual feedback
@@ -3980,6 +3995,13 @@ class TuneForgeUltimate {
             el.style.pointerEvents = '';
             el.style.opacity = '';
         });
+        
+        // Reset undo button visual feedback
+        const undoBtn = document.getElementById('undoLast');
+        if (undoBtn) {
+            undoBtn.classList.remove('disabled');
+            undoBtn.title = 'Undo last message';
+        }
         
         // Focus back on input
         document.getElementById('userMessage').focus();

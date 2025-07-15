@@ -161,6 +161,20 @@
     line-height: 1.4;
 }
 
+/* Disabled Button State */
+button:disabled,
+button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+button:disabled:hover,
+button.disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* User Authentication Styles */
 .auth-message {
     color: var(--matrix-green);
