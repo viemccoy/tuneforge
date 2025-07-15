@@ -75,7 +75,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             // Check if we have a session token
-            const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
+            const sessionToken = sessionStorage.getItem('tuneforge_session');
             
             if (!sessionToken) {
                 // No token, redirect to login
@@ -90,7 +90,6 @@ class TuneForgeUltimate {
                 if (!response.ok) {
                     // Invalid token, redirect to login
                     sessionStorage.removeItem('tuneforge_session');
-                    localStorage.removeItem('tuneforge_session');
                     window.location.href = '/login.html';
                     return;
                 }
@@ -126,8 +125,8 @@ class TuneForgeUltimate {
     
     // Helper method for authenticated fetch requests
     async fetchWithAuth(url, options = {}) {
-        // Get session token from storage (check both for consistency)
-        const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
+        // Get session token from storage
+        const sessionToken = sessionStorage.getItem('tuneforge_session');
         console.log('[fetchWithAuth] Session token:', sessionToken);
         console.log('[fetchWithAuth] URL:', url);
         
@@ -209,9 +208,8 @@ class TuneForgeUltimate {
     
     async logout() {
         try {
-            // Clear stored session from both storage types
+            // Clear stored session
             sessionStorage.removeItem('tuneforge_session');
-            localStorage.removeItem('tuneforge_session');
             
             await fetch(`${this.apiBase}/users`, {
                 method: 'DELETE',
@@ -2645,7 +2643,6 @@ class TuneForgeUltimate {
         const maxTokens = parseInt(document.getElementById('maxTokensValue').textContent);
         
         // Remove the last assistant message from UI
-        const flow = document.getElementById('conversationFlow');
         const messageBlocks = flow.querySelectorAll('.message-block');
         let lastAssistantBlock = null;
         

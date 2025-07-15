@@ -7,8 +7,8 @@ class TuneForgeLogin {
     }
     
     async checkExistingSession() {
-        // Check if already logged in (check both storage types for compatibility)
-        const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
+        // Check if already logged in
+        const sessionToken = sessionStorage.getItem('tuneforge_session');
         if (sessionToken) {
             try {
                 // Verify session is valid
@@ -27,7 +27,6 @@ class TuneForgeLogin {
             } catch (error) {
                 // Invalid session, clear it
                 sessionStorage.removeItem('tuneforge_session');
-                localStorage.removeItem('tuneforge_session');
             }
         }
     }
@@ -151,7 +150,6 @@ class TuneForgeLogin {
                 // Store session if provided
                 if (createData.session) {
                     sessionStorage.setItem('tuneforge_session', createData.session);
-                    localStorage.setItem('tuneforge_session', createData.session);
                     window.location.href = '/';
                     return;
                 }
@@ -169,9 +167,8 @@ class TuneForgeLogin {
             console.log('Login response:', loginData);
             
             if (loginData.success && loginData.session) {
-                // Store session and redirect (use localStorage for cross-tab persistence)
+                // Store session and redirect
                 sessionStorage.setItem('tuneforge_session', loginData.session);
-                localStorage.setItem('tuneforge_session', loginData.session);
                 messageEl.textContent = 'Login successful! Redirecting...';
                 
                 // Short delay for user feedback
