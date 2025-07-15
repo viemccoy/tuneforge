@@ -106,6 +106,7 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Auth check failed:', error);
                 sessionStorage.removeItem('tuneforge_session');
+                localStorage.removeItem('tuneforge_session');
                 window.location.href = '/login.html';
             }
         } else {
@@ -125,8 +126,8 @@ class TuneForgeUltimate {
     
     // Helper method for authenticated fetch requests
     async fetchWithAuth(url, options = {}) {
-        // Get session token from storage
-        const sessionToken = sessionStorage.getItem('tuneforge_session');
+        // Get session token from storage (check both for consistency)
+        const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
         console.log('[fetchWithAuth] Session token:', sessionToken);
         console.log('[fetchWithAuth] URL:', url);
         
@@ -208,8 +209,9 @@ class TuneForgeUltimate {
     
     async logout() {
         try {
-            // Clear stored session
+            // Clear stored session from both storage types
             sessionStorage.removeItem('tuneforge_session');
+            localStorage.removeItem('tuneforge_session');
             
             await fetch(`${this.apiBase}/users`, {
                 method: 'DELETE',

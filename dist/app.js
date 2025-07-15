@@ -75,7 +75,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             // Check if we have a session token
-            const sessionToken = sessionStorage.getItem('tuneforge_session');
+            const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
             
             if (!sessionToken) {
                 // No token, redirect to login
@@ -90,6 +90,7 @@ class TuneForgeUltimate {
                 if (!response.ok) {
                     // Invalid token, redirect to login
                     sessionStorage.removeItem('tuneforge_session');
+                    localStorage.removeItem('tuneforge_session');
                     window.location.href = '/login.html';
                     return;
                 }
@@ -105,6 +106,7 @@ class TuneForgeUltimate {
             } catch (error) {
                 console.error('Auth check failed:', error);
                 sessionStorage.removeItem('tuneforge_session');
+                localStorage.removeItem('tuneforge_session');
                 window.location.href = '/login.html';
             }
         } else {
@@ -124,8 +126,8 @@ class TuneForgeUltimate {
     
     // Helper method for authenticated fetch requests
     async fetchWithAuth(url, options = {}) {
-        // Get session token from storage
-        const sessionToken = sessionStorage.getItem('tuneforge_session');
+        // Get session token from storage (check both for consistency)
+        const sessionToken = localStorage.getItem('tuneforge_session') || sessionStorage.getItem('tuneforge_session');
         console.log('[fetchWithAuth] Session token:', sessionToken);
         console.log('[fetchWithAuth] URL:', url);
         
@@ -207,8 +209,9 @@ class TuneForgeUltimate {
     
     async logout() {
         try {
-            // Clear stored session
+            // Clear stored session from both storage types
             sessionStorage.removeItem('tuneforge_session');
+            localStorage.removeItem('tuneforge_session');
             
             await fetch(`${this.apiBase}/users`, {
                 method: 'DELETE',
@@ -345,7 +348,12 @@ class TuneForgeUltimate {
         document.querySelector('.token-decrease').addEventListener('click', () => this.adjustTokens(-100));
         document.querySelector('.token-increase').addEventListener('click', () => this.adjustTokens(100));
         
-        // Regenerate All
+        // Completion Controls
+        document.querySelector('.completion-decrease').addEventListener('click', () => this.adjustCompletions(-1));
+        document.querySelector('.completion-increase').addEventListener('click', () => this.adjustCompletions(1));
+        
+        // Actions
+        document.getElementById('undoLast').addEventListener('click', () => this.undoLastMessage());
         document.getElementById('regenerateLast').addEventListener('click', () => this.regenerateAll());
         
         // Export Actions
@@ -574,8 +582,13 @@ class TuneForgeUltimate {
                 <span class="folder-icon">&gt;</span>
                 <span class="bin-name">${this.escapeHtml(bin.name)}</span>
                 <span class="bin-count">${bin.conversationCount || 0}</span>
+                <button class="bin-settings-btn" title="Bin Settings">[...]</button>
             `;
             binHeader.addEventListener('click', async (e) => {
+                // Don't handle clicks on the settings button
+                if (e.target.classList.contains('bin-settings-btn')) {
+                    return;
+                }
                 e.stopPropagation();
                 
                 // Select the bin if it's not already selected
@@ -585,6 +598,13 @@ class TuneForgeUltimate {
                     // If already selected, just toggle expansion
                     this.toggleBinExpanded(bin.id);
                 }
+            });
+            
+            // Settings button event listener
+            const settingsBtn = binHeader.querySelector('.bin-settings-btn');
+            settingsBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.showBinSettings(bin);
             });
             
             // Conversation list (nested)
@@ -901,7 +921,7 @@ class TuneForgeUltimate {
         
         if (this.isCloudflare) {
             try {
-                const response = await this.fetchWithAuth(`${this.apiBase}/bins/${this.currentBin.id}`, {
+                const response = await this.fetchWithAuth(`${this.apiBase}/bins-fixed?id=${this.currentBin.id}`, {
                     method: 'DELETE'
                 });
                 
@@ -988,6 +1008,7 @@ class TuneForgeUltimate {
                 { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'openai' },
                 { id: 'o3-2025-04-16', name: 'GPT-o3', provider: 'openai' },
                 { id: 'o4-mini-2025-04-16', name: 'GPT-o4-mini', provider: 'openai' },
+                { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', provider: 'anthropic' },
                 { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
                 { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
                 { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
@@ -1329,7 +1350,7 @@ class TuneForgeUltimate {
         this.updateConversationNameDisplay();
     }
     
-    async sendMessage() {
+    async sendMessage(messageOverride = null, isRetry = false) {
         // Prevent duplicate calls
         if (this.isGenerating) {
             this.showNotification('Please wait for the current request to complete', 'warning');
@@ -1357,7 +1378,7 @@ class TuneForgeUltimate {
             return;
         }
         
-        const messageInput = document.getElementById('userMessage').value;
+        const messageInput = messageOverride || document.getElementById('userMessage').value;
         
         // Validate and sanitize input
         let message;
@@ -1413,12 +1434,15 @@ class TuneForgeUltimate {
             await this.saveConversation(true);
         }
         
-        // Clear input
-        document.getElementById('userMessage').value = '';
+        // Clear input (unless it's a retry)
+        if (!isRetry) {
+            document.getElementById('userMessage').value = '';
+        }
         
         // Get parameters
         const temperature = parseFloat(document.getElementById('temperature').value);
         const maxTokens = parseInt(document.getElementById('maxTokensValue').textContent);
+        const completions = parseInt(document.getElementById('completionsValue').textContent);
         
         // Show loading state
         this.showLoomLoading();
@@ -1428,7 +1452,8 @@ class TuneForgeUltimate {
             binId: this.currentBin.id,
             systemPrompt: document.getElementById('systemPrompt').value,
             messages: this.currentMessages,
-            models: this.selectedModels
+            models: this.selectedModels,
+            n: completions
         };
         
         // Check if any selected model is o3/o4-mini which requires special parameters
@@ -1531,12 +1556,47 @@ class TuneForgeUltimate {
         
         const messageEl = document.createElement('div');
         messageEl.className = 'message-block';
-        messageEl.innerHTML = `
+        
+        // For COT assistant messages, extract main content from fullContent
+        let displayContent = message.content;
+        let reasoning = '';
+        
+        if (message.role === 'assistant' && message.isCOT && message.content.includes('<reasoning>')) {
+            // Extract reasoning from saved full content
+            const reasoningMatch = message.content.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+            if (reasoningMatch) {
+                reasoning = reasoningMatch[1];
+                displayContent = message.content.replace(/<reasoning>[\s\S]*?<\/reasoning>/, '').trim();
+            }
+        } else if (message.role === 'assistant' && message.reasoning) {
+            // Use separate reasoning field if available
+            reasoning = message.reasoning;
+            displayContent = message.content;
+        }
+        
+        let messageHTML = `
             <div class="message ${message.role}">
-                <div class="message-role">${message.role.toUpperCase()}</div>
-                <div class="message-content">${this.escapeHtml(message.content)}</div>
-            </div>
+                <div class="message-role">${message.role.toUpperCase()}${message.model ? ` (${message.model})` : ''}${message.isCOT ? ' [COT]' : ''}</div>
+                <div class="message-content">${this.escapeHtml(displayContent)}</div>
         `;
+        
+        // Add reasoning toggle for COT messages
+        if (message.role === 'assistant' && reasoning) {
+            const messageIndex = this.currentMessages.indexOf(message);
+            messageHTML += `
+                <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning('loaded-${messageIndex}')">
+                    <span class="toggle-icon" id="reasoning-icon-loaded-${messageIndex}">▶</span>
+                    <span class="toggle-text">Show Reasoning Trace</span>
+                </div>
+                <div class="reasoning-content" id="reasoning-loaded-${messageIndex}" style="display: none;">
+                    <div class="reasoning-header">[REASONING TRACE]</div>
+                    <div class="reasoning-text">${this.escapeHtml(reasoning)}</div>
+                </div>
+            `;
+        }
+        
+        messageHTML += `</div>`;
+        messageEl.innerHTML = messageHTML;
         
         flow.appendChild(messageEl);
         flow.scrollTop = flow.scrollHeight;
@@ -1549,6 +1609,13 @@ class TuneForgeUltimate {
     
     showLoomLoading() {
         const flow = document.getElementById('conversationFlow');
+        
+        // Remove any existing loading loom first
+        const existingLoading = flow.querySelector('.loading-loom');
+        if (existingLoading) {
+            existingLoading.remove();
+        }
+        
         const loadingEl = document.createElement('div');
         loadingEl.className = 'message-block loading-loom';
         loadingEl.innerHTML = `
@@ -1577,19 +1644,34 @@ class TuneForgeUltimate {
         const loadingEl = flow.querySelector('.loading-loom');
         if (loadingEl) loadingEl.remove();
         
-        if (!data.responses || data.responses.length === 0) {
+        if (!data.responses || data.responses.length === 0 || data.responses.every(r => r.error)) {
             this.showNotification('No responses generated - your message has been saved', 'error');
             
-            // Add recovery option
+            // Add recovery option with better styling
             const recoveryEl = document.createElement('div');
             recoveryEl.className = 'message-recovery';
             recoveryEl.innerHTML = `
-                <button class="btn-recovery" onclick="app.retryLastMessage()">↻ Retry</button>
-                <button class="btn-recovery" onclick="app.removeLastMessage()">✕ Remove</button>
+                <div class="recovery-header">[GENERATION FAILED]</div>
+                <div class="recovery-actions">
+                    <button class="btn-recovery" onclick="tuneforge.retryLastMessage()">↻ RETRY</button>
+                    <button class="btn-recovery" onclick="tuneforge.editLastMessage()">✎ EDIT</button>
+                    <button class="btn-recovery danger" onclick="tuneforge.removeLastMessage()">✕ REMOVE</button>
+                </div>
             `;
             flow.appendChild(recoveryEl);
             return;
         }
+        
+        // Process responses - update model name to show completion index if multiple
+        const processedResponses = data.responses.map(resp => {
+            if (resp.totalCompletions > 1) {
+                return {
+                    ...resp,
+                    model: `${resp.model} (${resp.completionIndex}/${resp.totalCompletions})`
+                };
+            }
+            return resp;
+        });
         
         // Clear pending message backup on successful response
         sessionStorage.removeItem('tuneforge_pending_message');
@@ -1603,17 +1685,17 @@ class TuneForgeUltimate {
                     <div class="completion-title">ASSISTANT RESPONSES</div>
                     <div class="completion-nav">
                         <span class="completion-counter">
-                            <span id="loomIndex">1</span> / ${data.responses.length}
+                            <span id="loomIndex">1</span> / ${processedResponses.length}
                         </span>
                         <span>← → navigate | Enter select</span>
                     </div>
                 </div>
                 <div class="completion-slider">
                     <div class="completion-track" id="loomTrack">
-                        ${data.responses.map((resp, i) => this.createCompletionCard(resp, i)).join('')}
+                        ${processedResponses.map((resp, i) => this.createCompletionCard(resp, i)).join('')}
                     </div>
                     <div class="nav-indicators">
-                        ${data.responses.map((_, i) => `
+                        ${processedResponses.map((_, i) => `
                             <div class="nav-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></div>
                         `).join('')}
                     </div>
@@ -1627,22 +1709,22 @@ class TuneForgeUltimate {
         // Setup loom navigation
         this.activeLoom = {
             element: loomEl,
-            responses: data.responses,
+            responses: processedResponses,
             currentIndex: 0,
             createdAt: Date.now()
         };
         
         // Log unselected loom for debugging
         console.log('[TuneForge] Loom created with responses:', {
-            responseCount: data.responses.length,
-            models: data.responses.map(r => r.model),
+            responseCount: processedResponses.length,
+            models: processedResponses.map(r => r.model),
             messageCount: this.currentMessages.length,
             timestamp: new Date().toISOString()
         });
         
         // Save pending loom to session storage
         const pendingLoom = {
-            responses: data.responses,
+            responses: processedResponses,
             messageCountBeforeLoom: this.currentMessages.length,
             createdAt: Date.now()
         };
@@ -1672,13 +1754,24 @@ class TuneForgeUltimate {
     createCompletionCard(response, index) {
         const isError = response.error || !response.content;
         const escapedContent = !isError ? this.escapeHtml(response.content) : '';
+        const escapedReasoning = response.reasoning ? this.escapeHtml(response.reasoning) : '';
+        
+        // For COT models, show adjusted token counts
+        let tokenDisplay = '';
+        if (response.usage) {
+            if (response.isCOT && response.reasoningTokens) {
+                tokenDisplay = `${response.usage.total_tokens} tokens (excl. ${response.reasoningTokens} reasoning)`;
+            } else {
+                tokenDisplay = `${response.usage.total_tokens} tokens`;
+            }
+        }
         
         return `
             <div class="completion-card ${index === 0 ? 'active' : ''} ${isError ? 'error' : ''}" data-index="${index}">
                 <div class="completion-meta">
-                    <div class="completion-model">${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}</div>
+                    <div class="completion-model">${response.model || 'Unknown'}${response.edited ? ' (edited)' : ''}${response.isCOT ? ' [COT]' : ''}</div>
                     <div class="completion-stats">
-                        ${response.usage ? `${response.usage.total_tokens} tokens` : ''}
+                        ${tokenDisplay}
                     </div>
                 </div>
                 <div class="completion-content" id="content-${index}">
@@ -1686,6 +1779,16 @@ class TuneForgeUltimate {
                         `<div class="error-message">${response.error || 'No response generated'}</div>` :
                         escapedContent
                     }
+                    ${response.reasoning ? `
+                        <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning(${index})">
+                            <span class="toggle-icon" id="reasoning-icon-${index}">▶</span>
+                            <span class="toggle-text">Show Reasoning Trace</span>
+                        </div>
+                        <div class="reasoning-content" id="reasoning-${index}" style="display: none;">
+                            <div class="reasoning-header">[REASONING TRACE]</div>
+                            <div class="reasoning-text">${escapedReasoning}</div>
+                        </div>
+                    ` : ''}
                 </div>
                 ${!isError ? `
                 <div class="response-actions">
@@ -1831,22 +1934,45 @@ class TuneForgeUltimate {
             timestamp: new Date().toISOString()
         });
         
-        // Add to messages
+        // Add to messages - for COT models, save the full content
         this.currentMessages.push({
             role: 'assistant',
-            content: response.content,
-            model: response.model
+            content: response.isCOT && response.fullContent ? response.fullContent : response.content,
+            model: response.model,
+            isCOT: response.isCOT,
+            reasoning: response.reasoning,
+            usage: response.usage,
+            reasoningTokens: response.reasoningTokens
         });
         
         // Replace loom with message
         const messageEl = document.createElement('div');
         messageEl.className = 'message-block';
-        messageEl.innerHTML = `
+        
+        // Build message HTML with COT support
+        let messageHTML = `
             <div class="message assistant">
-                <div class="message-role">ASSISTANT (${response.model})</div>
+                <div class="message-role">ASSISTANT (${response.model})${response.isCOT ? ' [COT]' : ''}</div>
                 <div class="message-content">${this.escapeHtml(response.content)}</div>
-            </div>
         `;
+        
+        // Add reasoning toggle if it's a COT response
+        if (response.isCOT && response.reasoning) {
+            const messageIndex = this.currentMessages.length - 1; // Get the index of the message we just added
+            messageHTML += `
+                <div class="reasoning-toggle" onclick="tuneforge.toggleReasoning('msg-${messageIndex}')">
+                    <span class="toggle-icon" id="reasoning-icon-msg-${messageIndex}">▶</span>
+                    <span class="toggle-text">Show Reasoning Trace</span>
+                </div>
+                <div class="reasoning-content" id="reasoning-msg-${messageIndex}" style="display: none;">
+                    <div class="reasoning-header">[REASONING TRACE]</div>
+                    <div class="reasoning-text">${this.escapeHtml(response.reasoning)}</div>
+                </div>
+            `;
+        }
+        
+        messageHTML += `</div>`;
+        messageEl.innerHTML = messageHTML;
         
         this.activeLoom.element.replaceWith(messageEl);
         this.activeLoom = null;
@@ -1865,6 +1991,21 @@ class TuneForgeUltimate {
         
         // Focus input for next message
         document.getElementById('userMessage').focus();
+    }
+    
+    toggleReasoning(index) {
+        const reasoningDiv = document.getElementById(`reasoning-${index}`);
+        const icon = document.getElementById(`reasoning-icon-${index}`);
+        
+        if (reasoningDiv) {
+            if (reasoningDiv.style.display === 'none') {
+                reasoningDiv.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                reasoningDiv.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
     }
     
     editResponse(index) {
@@ -1891,16 +2032,41 @@ class TuneForgeUltimate {
             this.activeLoom.responses[index].content = newContent;
             this.activeLoom.responses[index].edited = true;
             
+            // If this was a COT response, update fullContent too
+            if (this.activeLoom.responses[index].isCOT) {
+                this.activeLoom.responses[index].fullContent = newContent + 
+                    (this.activeLoom.responses[index].reasoning ? 
+                     `\n\n<reasoning>${this.activeLoom.responses[index].reasoning}</reasoning>` : '');
+            }
+            
             // Update display
             const contentEl = document.getElementById(`content-${index}`);
             if (contentEl) {
-                contentEl.innerHTML = this.escapeHtml(newContent);
+                // Find the actual content div (before reasoning toggle if exists)
+                const reasoningToggle = contentEl.querySelector('.reasoning-toggle');
+                if (reasoningToggle) {
+                    // Insert edited content before reasoning toggle
+                    const contentDiv = document.createElement('div');
+                    contentDiv.innerHTML = this.escapeHtml(newContent);
+                    contentEl.innerHTML = '';
+                    contentEl.appendChild(contentDiv);
+                    contentEl.appendChild(reasoningToggle);
+                    
+                    // Re-add reasoning content if it exists
+                    const reasoningContent = document.getElementById(`reasoning-${index}`);
+                    if (reasoningContent) {
+                        contentEl.appendChild(reasoningContent);
+                    }
+                } else {
+                    contentEl.innerHTML = this.escapeHtml(newContent);
+                }
             }
             
             // Update model label to show (edited)
             const modelEl = document.querySelector(`.completion-card[data-index="${index}"] .completion-model`);
             if (modelEl && !modelEl.textContent.includes('(edited)')) {
-                modelEl.textContent += ' (edited)';
+                const cotIndicator = this.activeLoom.responses[index].isCOT ? ' [COT]' : '';
+                modelEl.innerHTML = `${this.activeLoom.responses[index].model} (edited)${cotIndicator}`;
             }
             
             // Hide editor
@@ -2422,6 +2588,29 @@ class TuneForgeUltimate {
     
     // Regeneration
     async regenerateAll() {
+        // Check if there's a recovery element (API error state)
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) {
+            // If there's a recovery element, use the retry functionality instead
+            this.retryLastMessage();
+            return;
+        }
+        
+        // Check if there's an active loom that needs to be selected first
+        if (this.activeLoom) {
+            this.showNotification('Please select a response first', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Add pulsing animation to draw attention
+                loomElement.classList.add('pulse-warning');
+                setTimeout(() => loomElement.classList.remove('pulse-warning'), 2000);
+            }
+            return;
+        }
+        
         // Prevent duplicate calls
         if (this.isGenerating) {
             this.showNotification('Please wait for the current request to complete', 'warning');
@@ -2471,6 +2660,9 @@ class TuneForgeUltimate {
         if (lastAssistantBlock) {
             lastAssistantBlock.remove();
         }
+        
+        // Clear any existing loom state since we're regenerating
+        this.activeLoom = null;
         
         // Remove from messages array
         this.currentMessages = this.currentMessages.slice(0, lastAssistantIndex);
@@ -2645,6 +2837,186 @@ class TuneForgeUltimate {
         setTimeout(() => {
             document.getElementById('regeneratingOverlay').style.display = 'none';
         }, 1000);
+    }
+    
+    async retryLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Get the last user message
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            // Regenerate with the same message
+            await this.sendMessage(lastUserMessage.content, true);
+        }
+    }
+    
+    editLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Get the last user message and put it back in the input
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            // Remove the last message from the array and UI
+            this.currentMessages.pop();
+            const lastMessageBlock = flow.lastElementChild;
+            if (lastMessageBlock && lastMessageBlock.querySelector('.message.user')) {
+                lastMessageBlock.remove();
+            }
+            
+            // Put the message back in the input box
+            document.getElementById('userMessage').value = lastUserMessage.content;
+            document.getElementById('userMessage').focus();
+            
+            // Update turn count
+            const turnCount = Math.floor(this.currentMessages.length / 2);
+            document.getElementById('turnCount').textContent = turnCount;
+            
+            this.showNotification('Message moved back to input box for editing', 'info');
+        }
+    }
+    
+    removeLastMessage() {
+        // Remove the recovery element
+        const flow = document.getElementById('conversationFlow');
+        const recoveryEl = flow.querySelector('.message-recovery');
+        if (recoveryEl) recoveryEl.remove();
+        
+        // Remove the last user message
+        const lastUserMessage = this.currentMessages[this.currentMessages.length - 1];
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+            this.currentMessages.pop();
+            const lastMessageBlock = flow.lastElementChild;
+            if (lastMessageBlock && lastMessageBlock.querySelector('.message.user')) {
+                lastMessageBlock.remove();
+            }
+            
+            // Update turn count
+            const turnCount = Math.floor(this.currentMessages.length / 2);
+            document.getElementById('turnCount').textContent = turnCount;
+            
+            this.showNotification('Message removed', 'info');
+        }
+    }
+    
+    async undoLastMessage() {
+        // Check if there's an active loom that needs to be selected first
+        if (this.activeLoom) {
+            this.showNotification('Please select a response first', 'warning');
+            // Focus the loom for keyboard navigation
+            const loomElement = this.activeLoom.element.querySelector('.completion-loom');
+            if (loomElement) {
+                loomElement.focus();
+                // Add pulsing animation to draw attention
+                loomElement.classList.add('pulse-warning');
+                setTimeout(() => loomElement.classList.remove('pulse-warning'), 2000);
+            }
+            return;
+        }
+        
+        // Check if we have any messages to undo
+        if (this.currentMessages.length < 2) {
+            this.showNotification('No messages to undo', 'warning');
+            return;
+        }
+        
+        // Show confirmation dialog
+        const lastMessage = this.currentMessages[this.currentMessages.length - 1];
+        const isAssistant = lastMessage.role === 'assistant';
+        const messagePreview = lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '');
+        
+        const confirmed = await this.showConfirmDialog({
+            title: 'Undo Last Message',
+            message: `Remove the last ${isAssistant ? 'assistant' : 'user'} message?`,
+            details: messagePreview,
+            confirmText: 'UNDO',
+            cancelText: 'CANCEL',
+            dangerous: false
+        });
+        
+        if (!confirmed) return;
+        
+        // Find the last user message index
+        let lastUserIndex = -1;
+        let lastAssistantIndex = -1;
+        
+        for (let i = this.currentMessages.length - 1; i >= 0; i--) {
+            if (this.currentMessages[i].role === 'assistant' && lastAssistantIndex === -1) {
+                lastAssistantIndex = i;
+            } else if (this.currentMessages[i].role === 'user' && lastUserIndex === -1) {
+                lastUserIndex = i;
+            }
+            
+            if (lastUserIndex !== -1 && lastAssistantIndex !== -1) break;
+        }
+        
+        // If we don't have a complete pair, handle edge cases
+        if (lastAssistantIndex === -1) {
+            // No assistant message, just remove the last user message
+            if (lastUserIndex !== -1) {
+                const userMessage = this.currentMessages[lastUserIndex];
+                this.currentMessages.splice(lastUserIndex, 1);
+                
+                // Put the message back in the input box
+                document.getElementById('userMessage').value = userMessage.content;
+                
+                // Remove from UI
+                const flow = document.getElementById('conversationFlow');
+                const messageBlocks = flow.querySelectorAll('.message-block');
+                if (messageBlocks.length > 0) {
+                    messageBlocks[messageBlocks.length - 1].remove();
+                }
+                
+                this.showNotification('Message restored to input box', 'success');
+                
+                // Save the updated conversation
+                if (this.currentConversationId) {
+                    await this.saveConversation(true);
+                }
+                return;
+            }
+        }
+        
+        // Normal case: remove the last user-assistant pair
+        if (lastUserIndex !== -1 && lastAssistantIndex !== -1) {
+            // Get the user message content before removing
+            const userMessage = this.currentMessages[lastUserIndex];
+            
+            // Remove both messages from the array
+            this.currentMessages = this.currentMessages.slice(0, lastUserIndex);
+            
+            // Put the user message back in the input box
+            document.getElementById('userMessage').value = userMessage.content;
+            
+            // Remove from UI - find and remove the last two message blocks
+            const flow = document.getElementById('conversationFlow');
+            const messageBlocks = flow.querySelectorAll('.message-block');
+            
+            // Count how many blocks to remove (user message + assistant response)
+            let blocksToRemove = 0;
+            for (let i = messageBlocks.length - 1; i >= 0 && blocksToRemove < 2; i--) {
+                const block = messageBlocks[i];
+                if (block.querySelector('.message.user') || block.querySelector('.message.assistant')) {
+                    block.remove();
+                    blocksToRemove++;
+                }
+            }
+            
+            this.showNotification('Last exchange undone - message restored to input box', 'success');
+            
+            // Focus the input box
+            document.getElementById('userMessage').focus();
+            
+            // Save the updated conversation
+            if (this.currentConversationId) {
+                await this.saveConversation(true);
+            }
+        }
     }
     
     // Export & Stats
@@ -2857,6 +3229,12 @@ class TuneForgeUltimate {
         document.getElementById('maxTokensValue').textContent = newValue;
     }
     
+    adjustCompletions(delta) {
+        const current = parseInt(document.getElementById('completionsValue').textContent);
+        const newValue = Math.max(1, Math.min(10, current + delta));
+        document.getElementById('completionsValue').textContent = newValue;
+    }
+    
     showNotification(message, type = 'success') {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
@@ -2971,6 +3349,124 @@ class TuneForgeUltimate {
                 }
             });
         });
+    }
+    
+    // Bin settings modal
+    async showBinSettings(bin) {
+        try {
+            // Get current settings
+            const response = await this.fetchWithAuth(`${this.apiBase}/bin-settings?binId=${bin.id}`);
+            if (!response.ok) {
+                throw new Error('Failed to load bin settings');
+            }
+            
+            const settings = await response.json();
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-overlay active';
+            
+            modal.innerHTML = `
+                <div class="confirm-modal settings-modal">
+                    <div class="confirm-header">
+                        <h3>${this.escapeHtml(bin.name)}</h3>
+                        <div class="confirm-glow"></div>
+                    </div>
+                    <div class="confirm-body compact">
+                        <div class="visibility-toggle">
+                            <label class="toggle-option ${settings.visibility === 'personal' ? 'active' : ''}" 
+                                   data-value="personal">
+                                <input type="radio" name="visibility" value="personal" 
+                                       ${settings.visibility === 'personal' ? 'checked' : ''}
+                                       ${!settings.canEdit ? 'disabled' : ''}>
+                                <span class="toggle-label">PERSONAL</span>
+                            </label>
+                            <label class="toggle-option ${settings.visibility === 'team' ? 'active' : ''}" 
+                                   data-value="team">
+                                <input type="radio" name="visibility" value="team" 
+                                       ${settings.visibility === 'team' ? 'checked' : ''}
+                                       ${!settings.canEdit ? 'disabled' : ''}>
+                                <span class="toggle-label">TEAM</span>
+                            </label>
+                        </div>
+                        <div class="settings-meta">
+                            <span class="meta-item">@${settings.createdBy.split('@')[0]}</span>
+                            ${!settings.canEdit ? '<span class="meta-item warning">READ-ONLY</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="confirm-actions compact">
+                        <button id="settingsSave" class="confirm-button confirm" ${!settings.canEdit ? 'disabled' : ''}>SAVE</button>
+                        <button id="settingsCancel" class="confirm-button cancel">CLOSE</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const cleanup = () => {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            };
+            
+            // Handle toggle clicks
+            const toggleOptions = modal.querySelectorAll('.toggle-option');
+            toggleOptions.forEach(option => {
+                option.addEventListener('click', (e) => {
+                    if (settings.canEdit && !e.target.disabled) {
+                        // Remove active from all
+                        toggleOptions.forEach(opt => opt.classList.remove('active'));
+                        // Add active to clicked
+                        option.classList.add('active');
+                        // Check the radio
+                        const radio = option.querySelector('input[type="radio"]');
+                        if (radio) radio.checked = true;
+                    }
+                });
+            });
+            
+            // Handle save
+            document.getElementById('settingsSave').addEventListener('click', async () => {
+                const selectedVisibility = modal.querySelector('input[name="visibility"]:checked').value;
+                
+                // Close modal immediately for visual feedback
+                cleanup();
+                
+                try {
+                    const updateResponse = await this.fetchWithAuth(`${this.apiBase}/bin-settings?binId=${bin.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visibility: selectedVisibility })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error('Failed to update settings');
+                    }
+                    
+                    // Update local bin data
+                    bin.visibility = selectedVisibility;
+                    
+                    // Show success notification
+                    this.showNotification('Bin settings updated successfully', 'success');
+                    
+                    // Reload bins to reflect visibility changes
+                    await this.loadBins();
+                    
+                } catch (error) {
+                    console.error('Error updating bin settings:', error);
+                    this.showNotification('Failed to update settings: ' + error.message, 'error');
+                }
+            });
+            
+            // Handle cancel
+            document.getElementById('settingsCancel').addEventListener('click', cleanup);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) cleanup();
+            });
+            
+        } catch (error) {
+            console.error('Error showing bin settings:', error);
+            this.showNotification('Failed to load bin settings: ' + error.message, 'error');
+        }
     }
     
     // Loading overlay system
