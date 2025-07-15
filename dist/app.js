@@ -2193,7 +2193,7 @@ class TuneForgeUltimate {
                 const generateParams = {
                     binId: this.currentBin.id,
                     systemPrompt: document.getElementById('systemPrompt').value,
-                    messages: messagesToSend,
+                    messages: this.currentMessages,
                     models: [model]
                 };
                 
@@ -2253,7 +2253,7 @@ class TuneForgeUltimate {
             
             this.socket.emit('generate', {
                 systemPrompt: document.getElementById('systemPrompt').value,
-                messages: messagesToSend,
+                messages: this.currentMessages,
                 models: [model],
                 temperature,
                 maxTokens,
@@ -2680,7 +2680,7 @@ class TuneForgeUltimate {
                 const generateParams = {
                     binId: this.currentBin.id,
                     systemPrompt: document.getElementById('systemPrompt').value,
-                    messages: messagesToSend,
+                    messages: this.currentMessages,
                     models: this.selectedModels
                 };
                 
@@ -2728,7 +2728,7 @@ class TuneForgeUltimate {
             // Socket.io mode
             this.socket.emit('generate', {
                 systemPrompt: document.getElementById('systemPrompt').value,
-                messages: messagesToSend,
+                messages: this.currentMessages,
                 models: this.selectedModels,
                 temperature,
                 maxTokens
@@ -2769,7 +2769,7 @@ class TuneForgeUltimate {
                 const generateParams = {
                     binId: this.currentBin.id,
                     systemPrompt: document.getElementById('systemPrompt').value,
-                    messages: messagesToSend,
+                    messages: this.currentMessages,
                     models: this.selectedModels
                 };
                 
@@ -2821,7 +2821,7 @@ class TuneForgeUltimate {
             
             const socketParams = {
                 systemPrompt: document.getElementById('systemPrompt').value,
-                messages: messagesToSend,
+                messages: this.currentMessages,
                 models: this.selectedModels
             };
             
@@ -2895,7 +2895,7 @@ class TuneForgeUltimate {
                 const generateParams = {
                     binId: this.currentBin.id,
                     systemPrompt: document.getElementById('systemPrompt').value,
-                    messages: messagesToSend,
+                    messages: this.currentMessages,
                     models: uniqueFailedModels,
                     temperature: parseFloat(document.getElementById('temperature').value),
                     maxTokens: parseInt(document.getElementById('maxTokensValue').textContent),
