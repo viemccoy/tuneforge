@@ -127,6 +127,40 @@
     opacity: 0.8;
 }
 
+/* Retry Button in Loom */
+.btn-retry-failed {
+    margin-left: 1rem;
+    padding: 0.25rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--warning-color);
+    color: var(--warning-color);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.btn-retry-failed:hover {
+    background: rgba(255, 165, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Error Card Styling */
+.completion-card.error .completion-content {
+    border-left: 3px solid var(--error-color);
+    padding-left: 1rem;
+}
+
+.completion-card.error .error-message {
+    color: var(--error-color);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
 /* User Authentication Styles */
 .auth-message {
     color: var(--matrix-green);

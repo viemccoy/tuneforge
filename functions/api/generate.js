@@ -76,6 +76,11 @@ export async function onRequestPost(context) {
   const requestId = crypto.randomUUID();
   const timestamp = new Date().toISOString();
   
+  // Set a timeout promise to prevent Cloudflare 524 errors (95 seconds to be safe)
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Request timeout - processing took too long')), 95000)
+  );
+  
   try {
     const { binId, systemPrompt, messages, models, temperature, maxTokens, max_completion_tokens, n } = await request.json();
     
@@ -115,7 +120,32 @@ export async function onRequestPost(context) {
       Array.from({ length: n || 1 }, (_, i) => generateSingleResponse(modelId, i))
     );
     
-    async function generateSingleResponse(modelId, completionIndex) {
+    // If we have too many requests, process in smaller batches to avoid timeouts
+    const BATCH_SIZE = 6; // Process max 6 responses at a time
+    let responses = [];
+    
+    if (responsePromises.length > BATCH_SIZE) {
+      console.log(`[${timestamp}] Request ${requestId}: Processing ${responsePromises.length} responses in batches of ${BATCH_SIZE}`);
+      
+      for (let i = 0; i < responsePromises.length; i += BATCH_SIZE) {
+        const batch = responsePromises.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch);
+        responses.push(...batchResults);
+        
+        // Small delay between batches to prevent overwhelming the system
+        if (i + BATCH_SIZE < responsePromises.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    } else {
+      // Process all at once if small enough
+      responses = await Promise.all(responsePromises);
+    }
+    
+    async function generateSingleResponse(modelId, completionIndex, retryCount = 0) {
+      const maxRetries = 3;
+      const retryDelay = (attempt) => Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
+      
       try {
         // Handle OpenAI models (including o3/o4-mini)
         if ((modelId.startsWith('gpt') || modelId.startsWith('o3') || modelId.startsWith('o4')) && openai) {
@@ -312,17 +342,48 @@ export async function onRequestPost(context) {
           };
         }
       } catch (error) {
-        console.error(`Error with ${modelId}:`, error);
+        console.error(`Error with ${modelId} (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+        
+        // Retry logic with exponential backoff
+        if (retryCount < maxRetries) {
+          const delay = retryDelay(retryCount);
+          console.log(`Retrying ${modelId} after ${delay}ms...`);
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Recursive retry
+          return generateSingleResponse(modelId, completionIndex, retryCount + 1);
+        }
+        
+        // After all retries failed
         return {
           model: modelId,
-          error: error.message,
+          error: `${error.message} (after ${maxRetries + 1} attempts)`,
+          errorDetails: {
+            message: error.message,
+            attempts: retryCount + 1,
+            modelId: modelId
+          },
           completionIndex: completionIndex + 1,
           totalCompletions: n || 1
         };
       }
     }
     
-    const responses = await Promise.all(responsePromises);
+    // The responses are already processed in batches above, so we just need to handle timeout
+    // If we haven't finished by now, return what we have
+    if (responses.length === 0) {
+      console.warn(`[${timestamp}] Request ${requestId}: No responses generated`);
+      responses = [{
+        model: 'system',
+        error: 'No responses generated - all models failed or timed out',
+        errorDetails: {
+          message: 'Generation failure',
+          models: models
+        }
+      }];
+    }
     
     // Log response summary
     const successCount = responses.filter(r => !r.error).length;
@@ -338,9 +399,19 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error(`[${timestamp}] Request ${requestId} error:`, {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      models: models,
+      messageCount: messages?.length
     });
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: {
+        timestamp,
+        requestId,
+        models,
+        messageCount: messages?.length
+      }
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

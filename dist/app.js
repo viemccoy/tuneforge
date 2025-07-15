@@ -1675,18 +1675,23 @@ class TuneForgeUltimate {
         // Clear pending message backup on successful response
         sessionStorage.removeItem('tuneforge_pending_message');
         
+        // Check if there are any failed responses
+        const hasFailures = processedResponses.some(r => r.error);
+        const failureCount = processedResponses.filter(r => r.error).length;
+        
         // Create loom
         const loomEl = document.createElement('div');
         loomEl.className = 'message-block';
         loomEl.innerHTML = `
             <div class="completion-loom" tabindex="0">
                 <div class="completion-header">
-                    <div class="completion-title">ASSISTANT RESPONSES</div>
+                    <div class="completion-title">ASSISTANT RESPONSES ${hasFailures ? `(${failureCount} failed)` : ''}</div>
                     <div class="completion-nav">
                         <span class="completion-counter">
                             <span id="loomIndex">1</span> / ${processedResponses.length}
                         </span>
                         <span>← → navigate | Enter select</span>
+                        ${hasFailures ? `<button class="btn-retry-failed" onclick="tuneforge.retryFailedModels()">↻ RETRY FAILED</button>` : ''}
                     </div>
                 </div>
                 <div class="completion-slider">
@@ -2849,6 +2854,134 @@ class TuneForgeUltimate {
             // Regenerate with the same message
             await this.sendMessage(lastUserMessage.content, true);
         }
+    }
+    
+    async retryFailedModels() {
+        if (!this.activeLoom) {
+            this.showNotification('No active loom to retry', 'error');
+            return;
+        }
+        
+        // Find which models failed
+        const failedModels = this.activeLoom.responses
+            .filter(r => r.error)
+            .map(r => r.model.replace(/ \(\d+\/\d+\)$/, '')); // Remove completion index
+        
+        if (failedModels.length === 0) {
+            this.showNotification('No failed models to retry', 'info');
+            return;
+        }
+        
+        // Get unique model IDs
+        const uniqueFailedModels = [...new Set(failedModels)];
+        
+        this.showNotification(`Retrying ${uniqueFailedModels.length} failed model(s)...`);
+        
+        // Get the last user message
+        const lastUserIndex = this.currentMessages.findLastIndex(m => m.role === 'user');
+        if (lastUserIndex === -1) {
+            this.showNotification('No user message found', 'error');
+            return;
+        }
+        
+        const messagesToSend = this.currentMessages.slice(0, lastUserIndex + 1);
+        
+        // Generate with only the failed models
+        if (this.isCloudflare) {
+            try {
+                this.isGenerating = true;
+                this.activeRequestId = Date.now().toString();
+                
+                const generateParams = {
+                    binId: this.currentBin.id,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    messages: messagesToSend,
+                    models: uniqueFailedModels,
+                    temperature: parseFloat(document.getElementById('temperature').value),
+                    maxTokens: parseInt(document.getElementById('maxTokensValue').textContent),
+                    n: parseInt(document.getElementById('completionsValue').textContent)
+                };
+                
+                const response = await this.fetchWithAuth(`${this.apiBase}/generate`, {
+                    method: 'POST',
+                    body: JSON.stringify(generateParams)
+                });
+                
+                const data = await response.json();
+                
+                if (data.responses && data.responses.length > 0) {
+                    // Add successful responses to the existing loom
+                    const successfulResponses = data.responses.filter(r => !r.error);
+                    
+                    if (successfulResponses.length > 0) {
+                        // Replace failed responses with new successful ones
+                        this.activeLoom.responses = this.activeLoom.responses.map(existingResp => {
+                            if (existingResp.error) {
+                                const newResp = successfulResponses.find(r => 
+                                    r.model === existingResp.model || 
+                                    r.model.startsWith(existingResp.model.replace(/ \(\d+\/\d+\)$/, ''))
+                                );
+                                if (newResp) {
+                                    successfulResponses.splice(successfulResponses.indexOf(newResp), 1);
+                                    return newResp;
+                                }
+                            }
+                            return existingResp;
+                        });
+                        
+                        // Refresh the loom display
+                        this.refreshLoomDisplay();
+                        this.showNotification(`Retry successful: ${data.responses.filter(r => !r.error).length} responses generated`);
+                    } else {
+                        this.showNotification('Retry failed - no successful responses', 'error');
+                    }
+                } else {
+                    this.showNotification('Retry failed - no responses', 'error');
+                }
+            } catch (error) {
+                console.error('Retry failed:', error);
+                this.showNotification('Retry failed', 'error');
+            } finally {
+                this.isGenerating = false;
+                this.activeRequestId = null;
+            }
+        }
+    }
+    
+    refreshLoomDisplay() {
+        if (!this.activeLoom) return;
+        
+        const loomEl = this.activeLoom.element;
+        const track = loomEl.querySelector('.completion-track');
+        if (!track) return;
+        
+        // Rebuild completion cards
+        track.innerHTML = this.activeLoom.responses.map((resp, i) => 
+            this.createCompletionCard(resp, i)
+        ).join('');
+        
+        // Update header with failure count
+        const hasFailures = this.activeLoom.responses.some(r => r.error);
+        const failureCount = this.activeLoom.responses.filter(r => r.error).length;
+        const titleEl = loomEl.querySelector('.completion-title');
+        
+        if (titleEl) {
+            titleEl.innerHTML = `ASSISTANT RESPONSES ${hasFailures ? `(${failureCount} failed)` : ''}`;
+        }
+        
+        // Update or add retry button
+        const navEl = loomEl.querySelector('.completion-nav');
+        const existingRetryBtn = navEl.querySelector('.btn-retry-failed');
+        
+        if (hasFailures && !existingRetryBtn) {
+            navEl.innerHTML += `<button class="btn-retry-failed" onclick="tuneforge.retryFailedModels()">↻ RETRY FAILED</button>`;
+        } else if (!hasFailures && existingRetryBtn) {
+            existingRetryBtn.remove();
+        }
+        
+        // Reset to first card
+        this.activeLoom.currentIndex = 0;
+        this.updateLoomNavigation(loomEl, 0);
     }
     
     editLastMessage() {
